@@ -3,9 +3,9 @@
   "theme": "maple",
   "name": "3CVC Project Guide",
   "colors": {
-    "primary": "#befcc2",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#1e1e1e",
+    "light": "#fe2d78",
+    "dark": "#befcc2"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -68,5 +68,8 @@
       "github": "https://github.com/mintlify",
       "linkedin": "https://linkedin.com/company/mintlify"
     }
+  },
+  "icons": {
+    "library": "fontawesome"
   }
 }
