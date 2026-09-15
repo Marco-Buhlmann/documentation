@@ -40,10 +40,10 @@
         "group": "Overview",
         "pages": [
           "index",
-          "untitled-page",
-          "untitled-page-2",
-          "untitled-page-3",
-          "untitled-page-4"
+          "jcore",
+          "mockingbird",
+          "tendril",
+          "aletheia"
         ]
       }
     ]
