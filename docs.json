@@ -37,9 +37,13 @@
     },
     "groups": [
       {
-        "group": "Getting Started",
+        "group": "Overview",
         "pages": [
-          "index"
+          "index",
+          "untitled-page",
+          "untitled-page-2",
+          "untitled-page-3",
+          "untitled-page-4"
         ]
       }
     ]
