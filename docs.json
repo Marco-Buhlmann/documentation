@@ -71,5 +71,11 @@
   },
   "icons": {
     "library": "fontawesome"
+  },
+  "background": {
+    "image": {
+      "light": "/images/AdobeStock_428996617.jpeg",
+      "dark": "/images/AdobeStock_428996617.jpeg"
+    }
   }
 }
