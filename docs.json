@@ -7,7 +7,10 @@
     "light": "#fe2d78",
     "dark": "#befcc2"
   },
-  "favicon": "/favicon.svg",
+  "favicon": {
+    "light": "/images/3cvc.png",
+    "dark": "/images/3cvc.png"
+  },
   "navigation": {
     "pages": [
       {
@@ -78,5 +81,8 @@
       "light": "/images/AdobeStock_428996617.jpeg",
       "dark": "/images/AdobeStock_428996617.jpeg"
     }
+  },
+  "fonts": {
+    "family": "Roboto"
   }
 }
