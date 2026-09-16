@@ -14,6 +14,16 @@
   "navigation": {
     "pages": [
       {
+        "group": "Overview",
+        "pages": [
+          "index",
+          "jcore",
+          "mockingbird",
+          "tendril"
+        ]
+      },
+      "aletheia",
+      {
         "group": "Getting Started",
         "pages": [
           "index",
@@ -34,19 +44,7 @@
           "icon": "newspaper"
         }
       ]
-    },
-    "groups": [
-      {
-        "group": "Overview",
-        "pages": [
-          "index",
-          "jcore",
-          "mockingbird",
-          "tendril",
-          "aletheia"
-        ]
-      }
-    ]
+    }
   },
   "logo": {
     "light": "/images/3cvc.png",
