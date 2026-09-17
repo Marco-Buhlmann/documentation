@@ -1,0 +1,119 @@
+---
+title: "Architecture"
+description: "How a scan runs, how scoring and drift detection work, and how to write a probe."
+icon: "sitemap"
+---
+
+Mockingbird is a single SwiftPM executable target, packaged into an `.app` bundle by `scripts/build-app.sh`. It has no dependencies, no `.xcodeproj` and makes no network calls.
+
+```
+Entry.swift            argv switch — --scan / --emit-fixes / --help, else MockingbirdApp.main()
+  │
+  ├── Model/           what a control is
+  │     Rule.swift             Rule, Section, Tier, Severity, CheckResult, Scan, Posture,
+  │                            DrillRecord, EnforcementState, Event
+  │     DefaultRules.swift     the shell prelude + rule constructor
+  │     +Invariants.swift      N1–N7
+  │     +Phases.swift          P0–P5
+  │     +Fixes.swift           remediation script generators + the guard source
+  │
+  ├── Engine/          what it does
+  │     Shell.swift            bash runner with timeout, plus Paths and Store
+  │     RuleEngine.swift       evaluate → CheckResult; score → ScoreBucket
+  │     PostureProbe.swift     the §0 numbers and the fingerprints drift is measured against
+  │     Enforcement.swift      guard install/register/remove; FixRunner
+  │
+  ├── State/AppModel   scans, events, drills, prefs, timer, drift detection
+  └── Views/           Overview · Doctrine · Monitor · Enforcement · Drills · Settings
+```
+
+## How a scan works
+
+`AppModel.scan` goes through the rule list and evaluates each rule off the main actor, so the progress bar stays accurate. Then it measures the posture numbers once and adds a `Scan` record.
+
+A `shell` rule's `check` is appended to `DefaultRules.prelude` and run with `/bin/bash -c`, with a 25-second timeout. The prelude provides helper functions, which keeps each probe short enough to read and edit in the app.
+
+### Probe helpers
+
+| Helper | Returns |
+|---|---|
+| `mb_perm BUCKET` | One permission bucket (`allow`, `deny` or `ask`), combined across `settings.json` and `settings.local.json` |
+| `mb_count BUCKET` | How many entries are in that bucket |
+| `mb_pretool` | Every registered `PreToolUse` hook command |
+| `mb_profile NAME` | The path to a profile |
+| `mb_profile_perm NAME BUCKET` | One permission bucket from a profile |
+| `mb_subsuming REGEX` | Allow entries that give an interpreter matching the regex a blank cheque |
+| `mb_ok` · `mb_partial` · `mb_fail` | Exits with a message |
+| `mb_age_days PATH` | Whole days since the path was last modified |
+
+### Exit codes
+
+| Exit code | Status |
+|---|---|
+| `0` | Holding |
+| `2` | Partial |
+| `124` | Unknown (timed out) |
+| anything else | Open |
+
+The probe's stdout and stderr become the evidence shown in the app.
+
+### Detecting blank cheques
+
+`mb_subsuming` exists because matching the exact strings the doctrine names is not enough. `Bash(sudo sqlite3:*)`, `Bash(timeout 30 python3:*)` and `Bash(/usr/bin/python3 -c ' *)` are all blank cheques, and none of them match `^Bash\(sqlite3:\*\)$`.
+
+The helper splits each entry into tokens and finds the first token whose basename is an interpreter. Then it checks what follows. A bare `*`, a trailing `:*`, `-c`, `-e` or stdin all count as blank cheques. A spelled-out command does not, because N5 explicitly tells you to keep a few of those.
+
+Fixes for these rules use the *same* detector instead of a regex of their own. An earlier version used a separate pattern, and its `sh` alternative matched the `sh` in `./build.sh`. That removed a grant that was never a blank cheque. Matching the whole basename keeps `build.sh`, `du -sh` and `node --version` out. Sharing one detector also means a probe can't report a finding its own fix can't fix.
+
+## Scoring
+
+A rule's severity is its weight: critical 10, high 6, medium 3, low 1.
+
+For each group of rules, `possible` is the total weight of every enabled rule. `earned` is the sum of `credit × weight`, where credit is 1.0 for holding, 0.5 for partial and 0 otherwise. Disabled rules are left out of the total, so turning a rule off lowers the maximum score instead of inflating your score.
+
+The same function scores the whole pack, a single invariant or a single phase.
+
+## Drift
+
+Each scan records:
+
+- SHA-256 prefixes of `settings.json`, `settings.local.json`, the guard hook and `CLAUDE.md`
+- The size and modification time of the T0 SQLite file triplet (the database plus its `-wal` and `-shm` files)
+- The number of allow, deny and ask entries
+
+Comparing two scans in a row can produce four kinds of event:
+
+1. A rule that was holding stopped holding.
+2. A config file's fingerprint changed.
+3. A file disappeared.
+4. The T0 store changed.
+
+The `p2.t0-movement-attributable` rule goes further. It uses `lsof` to check whether any process has the original open. That separates growth while the recorder is running from growth with no process attached.
+
+## Persistence
+
+Mockingbird stores plain JSON under `~/Library/Application Support/Mockingbird/`:
+
+| File | Contents |
+|---|---|
+| `rules.json` | The rule pack, including your edits and custom rules |
+| `scans.json` | The last 60 scans |
+| `events.json` | Drift, fixes, drills and enforcement changes |
+| `drills.json` | Recorded drill runs |
+| `prefs.json` | App preferences |
+| `t0-baseline.txt` | The T0 baseline that movement is measured against |
+
+Enforcement state is stored separately at `~/.config/mockingbird/enforcement.json`, because the guard reads it on every call.
+
+<Warning>
+  The rule pack is written only once. Defaults go to `rules.json` on first launch, and Mockingbird never reads them from the app binary again. If you change a rule in Swift, existing installs won't see the change until you use **Settings → Restore built-in pack**.
+</Warning>
+
+## Build
+
+```bash
+./scripts/build-app.sh          # regenerate the icon, compile a release build, assemble dist/Mockingbird.app
+swift build --package-path App  # debug build only
+```
+
+`scripts/make-icon.swift` finds the accent-colored glyph in the brand logo and removes its white background using the blue channel. A plain crop would include the "D" from the wordmark. The script then renders the iconset and a transparent mark for the sidebar.
