@@ -6,23 +6,9 @@ icon: "sitemap"
 
 JCore's logical stack has four functional layers. Three cross-cutting pieces sit between them: a local network, a storage module and a dialog management module. Everything runs on one infrastructure layer.
 
-```text
-Perception                 microphone · wake word · speech-to-text · text-to-speech
-  │
-  ├── Local VA network     LAN access point · VPN tunnel
-  │
-Context & understanding    memory · vector DB · graph DB · knowledge graph
-  │
-  ├── Storage module
-  │
-Reasoning                  intent parser · LLM · agents & pipelines
-  │
-  ├── Dialog management module
-  │
-Execution & control        speaker · IoT hub · APIs
-
-Infrastructure             NVIDIA RTX 4000 SFF Ada · Intel Core i5-13500
-```
+<Frame caption="The JIA logical stack">
+  <img src="/images/jcore/stack-diagram.png" alt="The JIA logical stack: perception, context and understanding, reasoning, and execution and control layers, connected by a local VA network, a storage module and a dialog management module, above an infrastructure layer." />
+</Frame>
 
 ## Perception
 
