@@ -39,7 +39,8 @@
             "icon": "folder-medical",
             "pages": [
               "aletheia",
-              "aletheia/architecture"
+              "aletheia/architecture",
+              "aletheia/access"
             ]
           }
         ]
