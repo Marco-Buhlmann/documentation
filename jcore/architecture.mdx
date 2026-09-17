@@ -1,0 +1,95 @@
+---
+title: "Architecture"
+description: "The components in each layer of the JIA stack, and the network and infrastructure they run on."
+icon: "sitemap"
+---
+
+JCore's logical stack has four functional layers. Three cross-cutting pieces sit between them: a local network, a storage module and a dialog management module. Everything runs on one infrastructure layer.
+
+```text
+Perception                 microphone · wake word · speech-to-text · text-to-speech
+  │
+  ├── Local VA network     LAN access point · VPN tunnel
+  │
+Context & understanding    memory · vector DB · graph DB · knowledge graph
+  │
+  ├── Storage module
+  │
+Reasoning                  intent parser · LLM · agents & pipelines
+  │
+  ├── Dialog management module
+  │
+Execution & control        speaker · IoT hub · APIs
+
+Infrastructure             NVIDIA RTX 4000 SFF Ada · Intel Core i5-13500
+```
+
+## Perception
+
+Perception turns sound into text and text back into sound.
+
+| Component | Implementation |
+| --- | --- |
+| Microphone | ESP32-S3 SoC |
+| Wake-word detection | [OpenWakeWord](https://github.com/dscripka/openWakeWord), as a custom [Wyoming](https://github.com/rhasspy/wyoming) service |
+| Speech-to-text | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), on CTranslate2 |
+| Text-to-speech | [Piper](https://github.com/rhasspy/piper), as a custom Wyoming service |
+
+Wyoming is the protocol Home Assistant uses to talk to voice services. Running wake-word detection and speech synthesis as Wyoming services lets them plug into Home Assistant's voice pipeline.
+
+## Local VA network
+
+The voice-assistant devices sit on their own network.
+
+| Component | Implementation |
+| --- | --- |
+| LAN access point | Raspberry Pi 4 Model B in access-point mode |
+| VPN tunnel | [WireGuard](https://www.wireguard.com/) |
+
+## Context & understanding
+
+This layer is what gives JCore persistent recall. It keeps what the assistant has learned in several forms, each suited to a different kind of lookup.
+
+| Component | Implementation |
+| --- | --- |
+| Memory | [AnythingLLM](https://anythingllm.com/) |
+| Vector database | [Chroma](https://www.trychroma.com/) |
+| Graph database | [Neo4j](https://neo4j.com/) |
+| Embedding graph / knowledge graph | Built on the stores above |
+
+The **storage module** sits below this layer and connects it to reasoning.
+
+## Reasoning
+
+| Component | Implementation |
+| --- | --- |
+| Intent parser | Classifies what a request is asking for |
+| LLM | [Mistral 7B v0.3](https://huggingface.co/mistralai/Mistral-7B-v0.3) |
+| Agents & pipelines | Multi-step work that spans more than one model call or tool |
+
+The **dialog management module** sits below this layer and connects it to execution.
+
+## Execution & control
+
+| Component | Implementation |
+| --- | --- |
+| Speaker | ESP32-S3 SoC |
+| IoT hub | [Home Assistant](https://www.home-assistant.io/) |
+| APIs | [LangChain](https://www.langchain.com/) tools |
+
+## Infrastructure
+
+The server that runs the stack:
+
+| Component | Part |
+| --- | --- |
+| GPU | NVIDIA RTX 4000 SFF Ada Generation |
+| CPU | Intel Core i5-13500 |
+
+The prototyping boards, including a Jetson Orin Nano for local inference, are listed under [Hardware](/jcore#hardware) on the overview page.
+
+## Not documented yet
+
+- **How the modules talk to each other.** The storage and dialog management modules are named in the design, but their interfaces aren't written up.
+- **Setup.** There are no install or configuration instructions yet.
+- **The hardware build report.** It's planned but not published.

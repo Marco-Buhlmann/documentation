@@ -22,7 +22,14 @@
       {
         "group": "Projects",
         "pages": [
-          "jcore",
+          {
+            "group": "JCore",
+            "icon": "globe",
+            "pages": [
+              "jcore",
+              "jcore/architecture"
+            ]
+          },
           {
             "group": "Mockingbird",
             "icon": "bird",
