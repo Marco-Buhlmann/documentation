@@ -1,0 +1,168 @@
+---
+title: "Biomarker reference"
+sidebarTitle: "Biomarker reference"
+description: "All 41 biomarkers in the catalogue, with their units, systems and grading bands."
+icon: "table-list"
+---
+
+The catalogue lives in `public.biomarkers`. Each row has a unit, the system it rolls up to, and three bands: the lab **reference** range, a tighter **optimal** range, and optional clinical **alert** thresholds. See [Grading](/aletheia/architecture#grading) for how they combine.
+
+<Warning>
+  These are common adult ranges, chosen to be defensible, not personalised. No clinician has reviewed them, and reference ranges vary between laboratories. Aletheia is a personal record, not medical advice.
+</Warning>
+
+## Systems
+
+The figure has 13 systems. Four of them (Neurology & Cognition, Vision & Hearing, Bone & Body Composition, Skin) have no biomarkers yet, so they stay dark for everyone.
+
+| Key | System | Biomarkers |
+| --- | --- | --- |
+| `brain` | Neurology & Cognition | 0 |
+| `sensory` | Vision & Hearing | 0 |
+| `thyroid` | Thyroid | 4 |
+| `lungs` | Respiratory | 3 |
+| `heart` | Cardiovascular | 6 |
+| `liver` | Liver | 4 |
+| `kidneys` | Kidney | 4 |
+| `metabolic` | Metabolic & Gut | 5 |
+| `hormones` | Hormones & Prostate | 5 |
+| `blood` | Blood & Immune | 6 |
+| `muscle` | Muscle & Performance | 4 |
+| `bone` | Bone & Body Composition | 0 |
+| `skin` | Skin | 0 |
+
+## Biomarkers
+
+All 41 biomarkers currently in the catalogue. Each row also carries an `aliases` list that the importers match names against.
+
+### Thyroid
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `tsh` | TSH | mIU/L | 0.4–4.5 | 0.5–2.5 | — |
+| `free_t4` | Free T4 | ng/dL | 0.8–1.8 | 1–1.5 | — |
+| `free_t3` | Free T3 | pg/mL | 2.3–4.2 | 3–4 | — |
+| `tpo_antibodies` | TPO antibodies | IU/mL | 0–35 | 0–20 | — |
+
+### Respiratory
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `fev1_fvc` | FEV1 / FVC | — | 0.6–0.95 | 0.75–0.95 | — |
+| `fev1_pct_predicted` | FEV1 % predicted | % | 60–130 | 80–130 | — |
+| `resting_spo2` | Resting SpO2 | % | 90–100 | 95–100 | — |
+
+### Cardiovascular
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `apob` | ApoB | mg/dL | 40–160 | 40–80 | > 100 |
+| `ldl_c` | LDL-C | mg/dL | 40–190 | 40–100 | — |
+| `lp_a` | Lp(a) | nmol/L | 0–200 | 0–75 | — |
+| `hs_crp` | hs-CRP | mg/L | 0–10 | 0–1 | — |
+| `bp_systolic` | Blood pressure, systolic | mmHg | 90–180 | 90–120 | — |
+| `bp_diastolic` | Blood pressure, diastolic | mmHg | 50–120 | 60–80 | — |
+
+### Liver
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `alt` | ALT | U/L | 5–60 | 7–40 | — |
+| `ast` | AST | U/L | 5–60 | 8–40 | — |
+| `ggt` | GGT | U/L | 5–80 | 8–50 | — |
+| `albumin` | Albumin | g/dL | 3–5.5 | 4–5.2 | — |
+
+### Kidney
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `egfr` | eGFR | mL/min | 30–130 | 90–130 | — |
+| `cystatin_c` | Cystatin C | mg/L | 0.4–1.4 | 0.5–1 | — |
+| `creatinine` | Creatinine | mg/dL | 0.5–1.5 | 0.7–1.2 | — |
+| `urine_acr` | Urine ACR | mg/g | 0–60 | 0–30 | — |
+
+### Metabolic & Gut
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `fasting_insulin` | Fasting insulin | uIU/mL | 2–25 | 2–6 | > 10 |
+| `fasting_glucose` | Fasting glucose | mg/dL | 60–130 | 70–90 | — |
+| `hba1c` | HbA1c | % | 4–7 | 4.5–5.4 | — |
+| `triglycerides` | Triglycerides | mg/dL | 30–250 | 30–100 | — |
+| `homa_ir` | HOMA-IR | — | 0.5–6 | 0.5–1.5 | > 2.0 |
+
+### Hormones & Prostate
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `total_testosterone` | Total testosterone | ng/dL | 250–900 | 500–900 | — |
+| `free_testosterone` | Free testosterone | pg/mL | 5–25 | 12–25 | — |
+| `shbg` | SHBG | nmol/L | 10–70 | 20–45 | — |
+| `psa` | PSA | ng/mL | 0–4 | 0–2.5 | — |
+| `dhea_s` | DHEA-S | ug/dL | 80–500 | 200–450 | — |
+
+### Blood & Immune
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `vitamin_d_25_oh` | Vitamin D, 25-OH | ng/mL | 10–100 | 50–80 | — |
+| `ferritin` | Ferritin | ng/mL | 20–400 | 50–200 | — |
+| `hemoglobin` | Hemoglobin | g/dL | 12–18 | 13.5–17 | — |
+| `vitamin_b12` | Vitamin B12 | pg/mL | 200–1000 | 500–900 | — |
+| `homocysteine` | Homocysteine | umol/L | 4–20 | 4–10 | — |
+| `white_cell_count` | White cell count | K/uL | 3–11 | 4–10 | — |
+
+### Muscle & Performance
+
+| Key | Name | Unit | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- | --- |
+| `vo2_max` | VO2 max | mL/kg/min | 25–60 | 42–60 | — |
+| `grip_strength` | Grip strength | kg | 30–70 | 45–70 | — |
+| `resting_heart_rate` | Resting heart rate | bpm | 40–90 | 40–60 | — |
+| `hrv_60_day_mean` | HRV (60-day mean) | ms | 20–120 | 55–120 | — |
+
+## Pending changes
+
+Two migrations are committed but **not applied**. Both change how a live record is graded, so applying them is a deliberate step for someone who has read the rows.
+
+### New biomarkers
+
+`20260822160000_healthkit_biomarkers.sql` adds three biomarkers the iPhone can read but the catalogue has no row for:
+
+| Key | Name | Unit | System | Reference | Optimal |
+| --- | --- | --- | --- | --- | --- |
+| `bmi` | Body mass index | kg/m² | Bone & Body Composition | 18.5–29.9 | 18.5–24.9 |
+| `respiratory_rate` | Respiratory rate | breaths/min | Respiratory | 10–24 | 12–20 |
+| `heart_rate_recovery` | Heart rate recovery (1 min) | bpm | Cardiovascular | ≥ 12 | ≥ 18 |
+
+### Sex-specific bands
+
+`20260822160100_sex_aware_bands.sql` adds `biomarker_bands`, which holds per-sex overrides. Without it, several bands are male bands with a unisex label: a healthy woman's total testosterone grades as **alert** against an optimal band of 500–900 ng/dL.
+
+An override replaces the whole band for a user whose `profiles.sex` matches. Users who haven't said, or who chose intersex or prefer not to say, keep the default band, which is deliberately the wider one.
+
+| Biomarker | Sex | Reference | Optimal | Alert |
+| --- | --- | --- | --- | --- |
+| `total_testosterone` | Male | 250–900 | 500–900 | — |
+| `total_testosterone` | Female | 15–70 | 25–70 | — |
+| `free_testosterone` | Male | 90–300 | 150–300 | — |
+| `free_testosterone` | Female | 3–19 | 5–19 | — |
+| `hemoglobin` | Male | 13.5–17.5 | 14.0–17.0 | — |
+| `hemoglobin` | Female | 12.0–15.5 | 12.5–15.0 | — |
+| `ferritin` | Male | 30–400 | 50–200 | — |
+| `ferritin` | Female | 15–200 | 30–150 | — |
+| `creatinine` | Male | 0.74–1.35 | 0.80–1.20 | — |
+| `creatinine` | Female | 0.59–1.04 | 0.65–1.00 | — |
+| `body_fat_pct` | Male | 5–24 | 11–20 | > 25 |
+| `body_fat_pct` | Female | 14–31 | 18–28 | > 32 |
+| `waist_circumference` | Male | ≤ 102 | ≤ 94 | > 102 |
+| `waist_circumference` | Female | ≤ 88 | ≤ 80 | > 88 |
+
+Every override stores its source in a `source` column, so each threshold can be checked.
+
+The same migration also:
+
+- Adds `body_fat_pct` (Body fat, %, default 5–31, optimal 11–28) and `waist_circumference` (Waist, cm, default ≤ 102, optimal ≤ 94).
+- Fixes the default band for `free_testosterone`. It is declared in pg/mL but was seeded with ng/dL numbers, a factor of ten too low. The default becomes 3–300, optimal 5–300.
+
+Until these are applied, the iPhone app still reads those measurements from Health, but review lists them as unplaceable instead of proposing them.

@@ -41,7 +41,8 @@
               "aletheia",
               "aletheia/architecture",
               "aletheia/access",
-              "aletheia/apple-apps"
+              "aletheia/apple-apps",
+              "aletheia/biomarkers"
             ]
           }
         ]
