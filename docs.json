@@ -82,5 +82,8 @@
   "fonts": {
     "family": "Open Sans"
   },
-  "description": "3CVC open source project documentation. 3cubed manages the following projects and encourages your contribution."
+  "description": "3CVC open source project documentation. 3cubed manages the following projects and encourages your contribution.",
+  "styling": {
+    "codeblocks": "dark"
+  }
 }
