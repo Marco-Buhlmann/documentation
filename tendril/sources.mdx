@@ -1,0 +1,148 @@
+---
+title: "Sources"
+description: "Connecting mail, Google Calendar, iMessage and Beeper, and how each source counts interactions."
+icon: "plug"
+---
+
+Tendril's interaction counts, Unsaved list and inferred connections all come from one index. The index is built from the sources you connect, plus the email domains already on your contact cards. Connect sources in the **Sources** screen, then click **Rebuild index**.
+
+<Note>
+  Sources are read on your Mac and the results stay there. The index is kept in memory and rebuilt on demand, so nothing is uploaded anywhere.
+</Note>
+
+## At a glance
+
+| Source | Channel | Needs | Look-back |
+| --- | --- | --- | --- |
+| **Email** | IMAP, headers only | An app password | 24 months |
+| **Google Calendar** | Calendar API, read-only | An OAuth client for each account | 24 months |
+| **iMessage** | The local Messages database | Full Disk Access | All history for counts, 24 months for group chats |
+| **Beeper** | Beeper Desktop's local API | Approval in Beeper | 24 months, within a set request budget |
+| **Shared work domains** | Your contact cards | Nothing | Always current |
+
+Each source reports a status line after a rebuild, like `412 of 1,380 matched · 96 named · 2,041 co-occurrences`. If a source fails, it shows `unavailable` and the reason. The other sources still run. A rebuild keeps running if you leave the Sources screen.
+
+## Email
+
+Tendril reads mail over IMAP with an app password. That means you don't need a Google Cloud project or a consent screen, and access doesn't expire after 7 days. It uses IMAP instead of the Gmail API because an `ENVELOPE` fetch returns the sender and recipients of hundreds of messages in one round trip, with no quota per message.
+
+<Steps>
+  <Step title="Create an app password">
+    For Gmail, go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords). Google shows the password in groups of four characters, and Tendril removes the spaces for you.
+  </Step>
+  <Step title="Add the mailbox">
+    In **Sources › Email**, enter the address, the app password and the IMAP host. The host defaults to `imap.gmail.com`, and Tendril connects on port 993.
+  </Step>
+  <Step title="Tendril checks it before saving">
+    Tendril logs in and finds your `\All` mailbox by its special-use flag, since the mailbox name depends on language and account. It only saves the account if that works. The password goes in the keychain.
+  </Step>
+</Steps>
+
+For each message from the last 24 months:
+
+- **Mail you sent** counts toward each `To` and `Cc` recipient and is marked outbound.
+- **Mail you received** counts toward the sender.
+- **Display names** from the headers are collected for the Unsaved list. Tendril ignores names that just repeat the address or are over 80 characters.
+- **Threads with 2 to 12 other people** count as one co-occurrence per thread per month. To match messages to a thread, Tendril ignores `Re:`, `Fwd:`, `AW:`, `WG:` and similar prefixes, and `[list]` tags.
+
+The index only reads headers. [Signature enrichment](/tendril/enrichment#signatures) is the only feature that reads message text.
+
+## Google Calendar
+
+Tendril only uses Google for calendars. It requests `calendar.readonly` and `userinfo.email` and nothing else. That keeps Gmail's restricted scopes out of the picture, since those require Google verification and a yearly security assessment.
+
+Every linked account needs its own OAuth client, created in the Cloud project that owns that account:
+
+| Account type | OAuth client | Sign-in lasts |
+| --- | --- | --- |
+| Google Workspace | **Internal** client from your organization | Doesn't expire |
+| Consumer (`gmail.com`) | **External** client in Testing, with you added as a test user | 7 days, then you reconnect |
+
+In **Sources › Google Calendar**, paste the client ID and secret. Check **Workspace account with an Internal OAuth client** if that applies, then click **Connect account** and finish signing in in your browser. You can link as many accounts as you like.
+
+For each event from the last 24 months:
+
+- **Solo events and cancelled events** are skipped.
+- **Events with more than 12 attendees** are skipped as broadcasts. Otherwise a weekly 30-person all-hands would look like close contact with 29 people.
+- **Every other attendee** gets one interaction. It counts as outbound if you organized the event.
+- **Attendee display names** are collected. They are usually the cleanest spelling of a name anywhere.
+- **Each occurrence of a recurring meeting** counts separately, since a standing meeting really is repeated contact.
+
+## iMessage
+
+Tendril reads the local Messages database directly, opened read-only and immutable so it never competes with Messages for writes. This needs **Full Disk Access**:
+
+1. Open **System Settings › Privacy & Security › Full Disk Access**. The iMessage card has a button that opens it.
+2. Add Tendril, then relaunch it.
+
+<Warning>
+  Full Disk Access is granted to the app's path. `build.sh` copies each new build over `/Applications/Tendril.app` so you don't lose the grant when you rebuild. Grant access to the copy in `/Applications`, not the one in `build/`.
+</Warning>
+
+- **Interaction counts** use all of your message history, since total history is what that number is for.
+- **Group chats with 2 to 12 other people** count as one co-occurrence for each month the chat had messages, going back 24 months. Nobody is credited as having started the chat, because Messages doesn't record who added whom.
+- **Messages you sent to a group** don't count toward any one person in it.
+
+## Beeper
+
+Beeper covers WhatsApp, LinkedIn, Signal, Telegram, Instagram, Facebook and X. Tendril reads them from Beeper Desktop's local API at `127.0.0.1:23373`, so there's nothing to set up in a developer console.
+
+<Steps>
+  <Step title="Turn on the API">
+    In Beeper Desktop, go to **Settings › Integrations** and enable the API.
+  </Step>
+  <Step title="Connect">
+    Click **Connect Beeper**. Tendril registers itself as an OAuth client (PKCE, with no client secret) and opens Beeper for you to approve.
+  </Step>
+</Steps>
+
+To avoid the inflated numbers a simple count would give:
+
+- **One-to-one chats** count every message toward the other person.
+- **Group chats** only count messages *from* each participant, credited to that participant. Your own group messages are skipped instead of being credited to everyone in the chat.
+- **iMessage chats in Beeper are skipped**, because they're already read from the Messages database. Counting them again would double every message.
+
+Beeper's API has no endpoint for message counts, and each page holds at most 25 messages. To keep a rebuild predictable, Tendril reads up to **400 chats** with at most **3 pages each**, starting with the most recently active. Chats past that limit still update when you last talked, but their message counts are left out rather than estimated. Chats with no activity in the last 24 months are skipped.
+
+## Shared work domains
+
+This source needs no setup and makes no requests. If two of your contacts have email addresses on the same private domain, they almost certainly work together.
+
+The hard part is telling an employer from an email provider. Tendril uses a fixed list of free-mail providers and ISPs. The list covers global providers, US ISPs, and providers in German-speaking countries, the rest of Europe, the Nordics and elsewhere. It also matches country variants such as `yahoo.co.uk` or `hotmail.fr`. A domain only counts if it has **2 to 12** addresses on your cards. Beyond that it's treated as an institution, like a university or a bank, where sharing a domain says little. [Connections](/tendril/connections#confidence) explains how much a shared domain counts for.
+
+## Matching people to cards
+
+Each source reports interactions for an *identity*, meaning an email address or phone number. Tendril matches identities to cards like this:
+
+- **Email addresses** are lowercased and trimmed.
+- **Phone numbers** are reduced to their last 10 digits, so `+1 (415) 555-0000` matches `4155550000`.
+- **One identity can match several cards.** Each card gets the full count.
+- **Identities with no card** go to the [Unsaved](#the-unsaved-list) list instead of being discarded.
+
+### The Unsaved list
+
+The Unsaved list shows people you correspond with who have no card, busiest first. Each one is named by the spelling seen most often in mail headers and calendar invitations. Ties go to the most recent spelling, then the longer one. Filter by at least 1, 3, 10 or 25 interactions, or dismiss people to hide them. To move someone into the main list, add them in Contacts.app and rebuild.
+
+## Sorting by interaction
+
+| Sort | Order |
+| --- | --- |
+| **Name** | Alphabetical |
+| **Last interaction** | Most recent first. People you've never talked to are listed last. |
+| **Most interactions** | Highest total first |
+| **Falling quiet** | People with plenty of history who have gone silent. Only contacts with at least 10 interactions are ranked, scored `log(total) × days since last ÷ (interactions in the last 3 months + 1)`. |
+
+## Troubleshooting
+
+Every source writes to the unified log under its own category (`mail`, `google`, `imessage`, `beeper`, `interactions`):
+
+```bash
+log show --predicate 'subsystem == "com.marcobuhlmann.tendril"' --last 30m --info --style compact
+```
+
+| Symptom | Cause |
+| --- | --- |
+| iMessage shows **Needs Full Disk Access** | The grant is missing, or was given to a different copy of the app. |
+| Beeper shows **not reachable on port 23373** | Beeper Desktop isn't running, or its API is turned off. |
+| Google account keeps asking you to reconnect | It's a consumer account on a Testing client, which expires every 7 days. |
+| Keychain prompts after every rebuild | The app is ad-hoc signed. See [Install](/tendril#install). |

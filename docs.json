@@ -38,6 +38,7 @@
             "icon": "atom-simple",
             "pages": [
               "tendril",
+              "tendril/sources",
               "tendril/connections"
             ]
           },
