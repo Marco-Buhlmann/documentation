@@ -50,5 +50,8 @@
   "description": "3CVC open source project documentation. 3cubed manages the following projects and encourages your contribution.",
   "styling": {
     "codeblocks": "dark"
+  },
+  "background": {
+    "image": "/images/AdobeStock_428996617.jpeg"
   }
 }
