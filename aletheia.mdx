@@ -4,4 +4,144 @@ icon:
   name: "folder-medical"
   style: "regular"
   library: "fontawesome"
+description: "A personal health record that shows what your numbers say, and what you have never measured."
+sidebarTitle: "Overview"
 ---
+
+Aletheia is a personal health record built around one idea: show people not just what their numbers say, but **what they have never measured**. On the body map, measured systems light up from inside. Everything you have never tested stays dark.
+
+<CardGroup cols={2}>
+  <Card title="Live demo" icon="globe" href="https://aletheia.marcobuhlmann.com">
+    aletheia.marcobuhlmann.com
+  </Card>
+
+  <Card title="Source" icon="github" href="https://github.com/3cubed-Ventures/aletheia-health">
+    3cubed-Ventures/aletheia-health
+  </Card>
+</CardGroup>
+
+<Note>
+  Nothing enters your record on its own. Every importer, whether it reads a CSV, a lab PDF, a connected medical record or Apple Health, only _proposes_ values. A value is saved when a person confirms it.
+</Note>
+
+## What it does
+
+|  |  |
+| --- | --- |
+| **Maps** | A body figure with 13 systems, from Thyroid to Skin. Each system takes the colour of its worst marker, and systems with no results stay dark. |
+| **Grades** | Each value is checked against three bands: a clinical action threshold, the lab reference range, and a tighter optimal range. The result is **alert**, **watch** or **ok**. |
+| **Imports** | CSV, TSV and JSON are parsed in the browser. Lab PDFs and images are read by Claude. Connected medical records come in through Metriport. Apple Health comes in through the Mac and iPhone apps. |
+| **Reviews** | Every importer lands in the same review form. You check each proposed value before it is saved. |
+| **Protects** | Every table is scoped to the signed-in user with row-level security. Files live in a private bucket. You can delete all of your health data from the account page. |
+| **Admits** | Sign-up is invite only. Requests are approved by hand, from the admin queue or straight from the notice email. |
+
+## Components
+
+<CardGroup cols={3}>
+  <Card title="Web app" icon="browser">
+    Static pages on Cloudflare Pages: the home page, sign-in, dashboard, upload, account and admin.
+  </Card>
+
+  <Card title="Supabase" icon="database">
+    Postgres schema, grading functions, RLS policies, the biomarker catalogue and six edge functions.
+  </Card>
+
+  <Card title="Mac & iPhone" icon="apple">
+    Native SwiftUI apps that read Apple Health and propose what they find into the same record.
+  </Card>
+</CardGroup>
+
+## Repository layout
+
+```text
+dashboard.html              the dashboard; self-contained, so it also renders with no backend
+dist/                       what gets deployed
+  index.html                public home page
+  login.html                sign in / sign up (password or emailed link; sign-up needs an access code)
+  upload.html               upload a file, then review the values it contains
+  account.html              profile, stats, and "delete all my health data"
+  admin.html                the admissions queue
+  decide.html               approve or decline one request from an email link
+  app.js                    shared Supabase client and helpers
+  parse.js                  deterministic CSV/TSV/JSON extraction
+supabase/
+  migrations/               schema, grading, RLS and the catalogue seed
+  functions/                access-request · access-admin · access-signup
+                            extract-biomarkers · metriport-import · metriport-webhook
+mac/                        Mac app: reads an Apple Health export
+ios/                        iPhone app: reads HealthKit directly, including lab results
+shared/                     code both apps compile: models, Supabase client, matcher, reductions
+scripts/doc-requests-sheet.gs   forwards documentation requests to a Google Sheet
+palette.html                colour token reference
+```
+
+## Run it locally
+
+The web app is static. Serve `dist/` and point `app.js` at your Supabase project:
+
+```bash
+python3 -m http.server 8902 -d dist
+```
+
+Apply the schema to your project:
+
+```bash
+npx supabase db push
+```
+
+<Warning>
+  `supabase db push` only picks up files named `<14-digit timestamp>_name.sql`. A file called `0001_…` is silently skipped. Generate the prefix with `date -u +%Y%m%d%H%M%S`.
+</Warning>
+
+## Deploy
+
+The site is hosted on Cloudflare Pages:
+
+```bash
+npx wrangler pages deploy dist --project-name aletheia --branch main
+```
+
+Serve it from a custom domain rather than the `*.pages.dev` host. A branded login form on a free `pages.dev` subdomain looks like credential phishing to reputation filters, and visitors were getting an unsafe-site warning. For the same reason, the Google and X sign-in buttons stay hidden behind `OAUTH_ENABLED` in `login.html` until those providers are configured.
+
+### Secrets
+
+Edge function secrets live under **Edge Functions → Secrets** in the Supabase dashboard, not under Project Settings. They take effect immediately, without a redeploy.
+
+| Secret | Enables |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Reading PDFs and images in `extract-biomarkers`. Without it, the function returns a clear "not configured" message. |
+| `METRIPORT_API_KEY` | The connected-records panel on the upload page. The panel is hidden until this is set. |
+| `METRIPORT_WEBHOOK_KEY` | HMAC verification of Metriport callbacks. |
+| `METRIPORT_ENV` | Set to `production` to reach real records. Anything else, including unset, uses the sandbox. |
+| `RESEND_API_KEY`, `ACCESS_MAIL_FROM` | Sending access notices and codes by email. |
+| `ADMIN_NOTIFY_EMAIL` | Fallback address for access notices, used until one is saved on the admin page. |
+
+```bash
+npx supabase secrets set ANTHROPIC_API_KEY=... --project-ref <your-project-ref>
+```
+
+## Known gaps
+
+- Deleting a user from the Supabase dashboard removes their rows but leaves their files in the storage bucket, where nobody can reach them. The in-app delete handles this correctly. The dashboard path still needs an edge function that clears storage first.
+- Google and X sign-in need provider credentials before those buttons work.
+- In light mode, the `--ok` and `--watch` colours fall below WCAG AA contrast when they tint small chip text.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/aletheia/architecture">
+    Grading, security, and how each importer turns a file into proposals.
+  </Card>
+
+  <Card title="Access control" icon="key" href="/aletheia/access">
+    Invite-only sign-up, access codes, and approving from the inbox.
+  </Card>
+
+  <Card title="Mac & iPhone apps" icon="mobile" href="/aletheia/apple-apps">
+    Importing Apple Health, and the code both apps share.
+  </Card>
+
+  <Card title="Biomarker reference" icon="table-list" href="/aletheia/biomarkers">
+    All 41 biomarkers, their units, systems and bands.
+  </Card>
+</CardGroup>

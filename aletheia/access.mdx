@@ -1,0 +1,118 @@
+---
+title: "Access control"
+description: "Invite-only sign-up: requesting access, approving it, access codes, and answering from the inbox."
+icon: "key"
+---
+
+Sign-up is invite only. There is no way to create an account without a code that an administrator issued.
+
+<Steps>
+  <Step title="Request">
+    A visitor clicks **Get Access** in the footer and enters an email address. The `access-request` function records it, and gives the same answer to everyone.
+  </Step>
+  <Step title="Approve">
+    An administrator approves or declines, either in `admin.html` or from the link in the notice email.
+  </Step>
+  <Step title="Code">
+    Approving issues a single-use code tied to that email address. It is valid for fourteen days.
+  </Step>
+  <Step title="Sign up">
+    The `access-signup` function checks the code and creates the account. This is the only way in.
+  </Step>
+</Steps>
+
+## What the schema guarantees
+
+Each of these is enforced in the database, not by the UI.
+
+<AccordionGroup>
+  <Accordion title="Only an administrator can read a code" icon="eye-slash">
+    `access_requests` has one policy: `select`, gated on `public.is_admin()`. A signed-in non-administrator reads zero rows.
+  </Accordion>
+
+  <Accordion title="Nobody can approve their own request" icon="user-lock">
+    There is no insert or update policy on `access_requests` for any role. Every write goes through an edge function holding the service key, and `access-admin` checks the admin roster before doing anything. Called directly by a signed-in non-administrator, it answers `403`.
+  </Accordion>
+
+  <Accordion title="Nobody can make themselves an administrator" icon="crown">
+    `public.admins` has no write policy at all. The roster is only changed from the SQL editor.
+
+    A flag on `profiles` would not have worked: that table's policy is `for all`, so anyone could have set their own.
+  </Accordion>
+</AccordionGroup>
+
+To add an administrator:
+
+```sql
+insert into public.admins (user_id, note)
+select id, 'why' from auth.users where email = 'them@example.com';
+```
+
+## Closing the other doors
+
+`access-signup` is only a real gate once the project stops accepting public sign-ups. Otherwise anyone can call the Supabase Auth API directly with the publishable key and skip it.
+
+<Warning>
+  In the Supabase dashboard, turn off **Allow new users to sign up** under **Authentication → Sign In / Providers**. Sign-up through the app keeps working, because the admin API does not check that switch. Until it is off, `admin.html` says so in red, based on a live read of `/auth/v1/settings`.
+</Warning>
+
+Magic-link sign-in needed the same fix. Left at its default, `signInWithOtp` creates an account for any address that asks. It now runs with `shouldCreateUser: false`.
+
+Accounts are created already confirmed. That is the verification, not a shortcut: the code was delivered to that inbox, works once, and is refused with any other address. A confirmation email would prove nothing new.
+
+## Answering from the inbox
+
+Each request is created with a 256-bit decision token. The notice email carries a link holding it, `/decide?t=…`, which opens a page showing that one request with **Approve** and **Decline** buttons. `admin.html` is still the queue, the audit trail and the settings page. The link is the fast path.
+
+### The link does nothing when fetched
+
+Mail scanners fetch links. Gmail's prefetcher has been seen spending a password-reset token eight seconds after it was sent. A link that approved on `GET` would be approved by a scanner before anyone read the email.
+
+So `decide.html` is static. Loading the request is a `POST`, and the decision is a second `POST` behind a button. Scanner-style `GET` requests at the link, and a `GET` at the function with `?action=approve`, leave the request `pending`. The function answers `405`.
+
+### What the token can do
+
+The token can decide its own request and nothing else:
+
+- It cannot list the queue, read settings or touch another row. `status` and `save_settings` answer `403`.
+- Passing a different `id` alongside it is ignored. The id always comes from the token's own row.
+- It expires when the request is redeemed, or after 30 days.
+
+Decisions made this way leave `decided_by` null. That is how an inbox decision is told apart from one made while signed in.
+
+## Email delivery
+
+Notices and codes are sent through [Resend](https://resend.com) when `RESEND_API_KEY` and `ACCESS_MAIL_FROM` are set as edge function secrets.
+
+Where notices go is a setting, not a secret. The field on `admin.html` writes `app_settings.access_notify_email`. `ADMIN_NOTIFY_EMAIL` is only the fallback for a deployment that has never saved that setting.
+
+### Without email configured
+
+Nothing breaks, and nothing pretends to work:
+
+- No notice is sent.
+- Approving still works, and the row records `delivery = 'manual'`.
+- The code is shown to whoever approved it, on the admin page or the decide page, so they can pass it on. Saying "approved" while keeping the code hidden would strand the requester.
+- `admin.html` shows a red warning. A queue nobody is told about is the dangerous kind of broken, because it looks like it is working.
+
+## Documentation requests
+
+The footer's documentation link opens a form that takes an email address. It writes to two places:
+
+| Destination | Role |
+| --- | --- |
+| `public.doc_requests` | The record. The policy is insert-only, with no select policy, so the publishable key can add a request but not read any. |
+| Google Sheet | A convenience copy, sent through `scripts/doc-requests-sheet.gs`. Failures here are silent, and the row stays in `doc_requests` with `forwarded = false`. |
+
+To connect the sheet:
+
+1. Paste `scripts/doc-requests-sheet.gs` into the sheet's Apps Script editor.
+2. Deploy it as a web app that executes as you, with access set to **Anyone**.
+3. Put the `/exec` URL in `SHEET_WEBHOOK` in `dist/index.html`.
+
+To find requests that never reached the sheet:
+
+```sql
+select email, created_at from public.doc_requests
+where not forwarded order by created_at;
+```

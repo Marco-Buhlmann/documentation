@@ -1,0 +1,158 @@
+---
+title: "Architecture"
+description: "How values are graded, how the record is secured, and how each importer turns a file into proposals."
+icon: "sitemap"
+---
+
+Aletheia is a static web app on Cloudflare Pages backed by Supabase. The browser talks to Postgres directly through the publishable key, and row-level security decides what it can see. Anything that needs a secret, such as reading a PDF with Claude or calling Metriport, runs in an edge function.
+
+```text
+Browser (dist/)
+  │  publishable key + user JWT
+  ▼
+Supabase
+  ├── Postgres       systems · biomarkers · results · documents · profiles
+  │                  grade_value() · latest_results · system_status
+  ├── Storage        private bucket, one folder per user id
+  └── Edge functions extract-biomarkers · metriport-import · metriport-webhook
+                     access-request · access-admin · access-signup
+```
+
+## Grading
+
+Each biomarker in the catalogue carries three bands. `grade_value()` checks a value against them in order, and the first match wins:
+
+| Check | Status |
+| --- | --- |
+| Outside `alert_low` / `alert_high` | **alert**: a clinical action threshold, such as ApoB over 100 mg/dL |
+| Outside `range_low` / `range_high` | **alert**: outside the lab reference range |
+| Outside `optimal_low` / `optimal_high` | **watch** |
+| Otherwise | **ok** |
+
+The alert thresholds exist because a value can sit inside a lab's "normal" range and still call for action.
+
+Two views build on this:
+
+- **`latest_results`** takes each user's most recent result per biomarker and grades it.
+- **`system_status`** rolls those up per system. A system takes its worst status. A system with no results at all is **none**, which is what leaves it dark on the figure.
+
+<Info>
+  A pending migration, `20260822160100_sex_aware_bands.sql`, adds `biomarker_bands` with per-sex overrides for testosterone, haemoglobin, ferritin, creatinine and two body-composition markers. Until it is applied, every user is graded against a single band, and several of those are male bands. See the [biomarker reference](/aletheia/biomarkers#pending-changes).
+</Info>
+
+## The figure
+
+The body outline is not traced artwork. Landmarks were measured off a reference illustration and stored as proportions of figure height: the crotch at 53.4%, the knee at 71.7%, a deltoid span of 30.7%. The outline is drawn as a Catmull-Rom spline through half the figure, mirrored about the centre line. To change the shape, you edit numbers, not path data.
+
+`dashboard.html` inlines its fonts, logo and figure geometry, so it also renders as a static page with no backend.
+
+## Security
+
+- Every user table has row-level security, scoped to `auth.uid()`.
+- Uploaded files live in a private storage bucket under `<user_id>/…`. The storage policies key on that first path segment.
+- The key in `app.js` is the publishable key. It is meant to ship in the browser and grants nothing on its own.
+
+This has been checked both ways: a signed-in user reads only their own rows, and an anonymous client reads nothing.
+
+The account page can delete all of a user's health data, including their stored files.
+
+## Importing data
+
+Every import path ends in the same review form. None of them writes to `results` on its own.
+
+<Tabs>
+  <Tab title="CSV, TSV, JSON">
+    Parsed in the browser by `dist/parse.js`. It is deterministic and sends nothing anywhere.
+
+    Names are matched against each biomarker's `aliases`, longest alias first. That way "Hemoglobin A1c" resolves to `hba1c`, and plain "Hemoglobin" resolves to `hemoglobin`.
+
+    The parser handles comparator results like `<0.1`, thousands separators, decorated labels and several date formats. Anything it does not recognise is shown to you, not dropped.
+  </Tab>
+
+  <Tab title="PDFs and images">
+    Sent to the `extract-biomarkers` edge function, which reads the file with Claude. Its proposals are limited to biomarkers in the catalogue.
+
+    Requires `ANTHROPIC_API_KEY`. Without it, the function answers with a clear "not configured" message.
+  </Tab>
+
+  <Tab title="Connected records">
+    Medical records from providers come through [Metriport](https://www.metriport.com) in two steps:
+
+    <Steps>
+      <Step title="metriport-import">
+        Starts a consolidated query and creates a row in `metriport_imports`.
+      </Step>
+      <Step title="metriport-webhook">
+        Receives Metriport's callback, downloads the FHIR bundle, maps it, and fills in that row. The browser watches the row through RLS.
+      </Step>
+    </Steps>
+
+    The panel on the upload page is hidden unless `METRIPORT_API_KEY` is set.
+  </Tab>
+
+  <Tab title="Apple Health">
+    Handled by the native apps. See [Mac & iPhone apps](/aletheia/apple-apps).
+  </Tab>
+</Tabs>
+
+## The Metriport path in detail
+
+### Why a webhook
+
+The consolidated query's status endpoint never returns a download URL. That only arrives by webhook, and the presigned link expires after three minutes, so a stored URL would be dead before anyone polled it.
+
+The webhook answers `200` immediately and downloads in `waitUntil`. Metriport allows four seconds for a response, and a few hundred resources don't fit in that.
+
+### Authenticating the callback
+
+The webhook runs with `verify_jwt` off, because Metriport cannot present a Supabase JWT. Instead, it checks an HMAC-SHA256 of the raw body under `METRIPORT_WEBHOOK_KEY`, compared in constant time. The public URL grants nothing on its own.
+
+The body is hashed exactly as received. Parsing and re-serialising it would change the signature over details like key order.
+
+### Matching observations
+
+Observations are matched by LOINC code first, then by display name. A code is a fact and a name is an inference, so the two carry different confidence into review.
+
+The LOINC table is deliberately incomplete. A wrong code is worse than a missing one: it files a value under the wrong marker while looking certain. Free PSA, the spirometry codes and plain glucose (`2345-7`, which is not fasting glucose) are left out for that reason and matched by name instead.
+
+### Picking a value
+
+The most recent reading wins, not the first one in the bundle. FHIR bundles are not sorted by date: the first real import took 14 of 17 values from 2006, out of a history that ran to 2023.
+
+### Sandbox and production
+
+<AccordionGroup>
+  <Accordion title="Sandbox quirks">
+    - Creating a patient attaches no data. You have to start a query separately, or the record stays at one resource.
+    - `POST /network/query` answers `400` in the sandbox, while the legacy `POST /document/query` answers `200`.
+
+    `action: "seed"` does both.
+  </Accordion>
+
+  <Accordion title="Going to production">
+    The functions use the sandbox unless `METRIPORT_ENV=production` is set, so a missing variable can never point them at real records.
+
+    `purposeOfUse` defaults to `treatment`. A personal health record should use `ias` (Individual Access Services), which requires an AAL2 verified-identity session per patient.
+  </Accordion>
+</AccordionGroup>
+
+## Database migrations
+
+`supabase/migrations/20260808000000_baseline.sql` is the schema as production actually has it, read out of the live database. The 41 biomarker rows were checked against production by an md5 fingerprint over every column.
+
+Everything in the baseline is idempotent (`if not exists`, `or replace`, `on conflict do nothing`). It does nothing against production and builds a complete schema against an empty database.
+
+```bash
+npx supabase db push
+```
+
+When adding a migration:
+
+- Name it `<timestamp>_what_it_does.sql`, using `date -u +%Y%m%d%H%M%S`. Other names are silently ignored by `db push`.
+- If it sets a grading threshold, put the source of that number in the row itself, not in a commit message. A number nobody can trace is a number nobody can check.
+
+## Home page
+
+`/` is a single fixed screen that never scrolls. The logo carries a scan: a brightened copy of the mark, revealed through a narrow band that moves down it, so the beam lights the artwork instead of sitting on top of it. It holds still when the visitor prefers reduced motion.
+
+The background is the login screen's aurora and grid, pulled from the same `aletheia.css`, so the two screens can't drift apart. Layout positions were measured off the approved design and live as custom properties at the top of `index.html`.

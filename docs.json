@@ -34,7 +34,17 @@
             ]
           },
           "tendril",
-          "aletheia"
+          {
+            "group": "Aletheia",
+            "icon": "folder-medical",
+            "pages": [
+              "aletheia",
+              "aletheia/architecture",
+              "aletheia/access",
+              "aletheia/apple-apps",
+              "aletheia/biomarkers"
+            ]
+          }
         ]
       }
     ]
