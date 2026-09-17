@@ -74,10 +74,7 @@
     "library": "fontawesome"
   },
   "background": {
-    "image": {
-      "light": "/images/AdobeStock_428996617.jpeg",
-      "dark": "/images/AdobeStock_428996617.jpeg"
-    }
+    "image": "/images/AdobeStock_428996617.jpeg"
   },
   "fonts": {
     "family": "Open Sans"
