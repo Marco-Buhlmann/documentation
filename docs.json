@@ -34,7 +34,14 @@
             ]
           },
           "tendril",
-          "aletheia"
+          {
+            "group": "Aletheia",
+            "icon": "folder-medical",
+            "pages": [
+              "aletheia",
+              "aletheia/architecture"
+            ]
+          }
         ]
       }
     ]
