@@ -1,0 +1,199 @@
+---
+title: "Mac & iPhone apps"
+sidebarTitle: "Mac & iPhone apps"
+description: "Native SwiftUI apps that read Apple Health and propose what they find into the same record."
+icon: "mobile"
+---
+
+Two native SwiftUI apps bring Apple Health into the record the web app reads. Both write to the same Supabase tables and follow the same rule: they propose values, and a person confirms them.
+
+<CardGroup cols={2}>
+  <Card title="Mac" icon="laptop">
+    Reads an Apple Health **export**. No dependencies and no developer account: it signs ad-hoc and never links HealthKit.
+  </Card>
+
+  <Card title="iPhone" icon="mobile">
+    Reads **HealthKit** directly, including lab results from connected providers. Never writes to Health.
+  </Card>
+</CardGroup>
+
+## Build
+
+Both projects are generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+
+<CodeGroup>
+```bash Mac
+cd mac
+xcodegen generate          # writes Aletheia.xcodeproj
+open Aletheia.xcodeproj    # or: xcodebuild -scheme Aletheia build
+```
+
+```bash iPhone
+cd ios
+xcodegen generate
+open Aletheia.xcodeproj    # ⌘R to a simulator or a phone (see Signing)
+```
+</CodeGroup>
+
+## Why two apps
+
+HealthKit compiles on macOS, but a Mac has nothing to read. `HKHealthStore.isHealthDataAvailable()` returns `false`, and there is no health database, no Health app and no `healthd`. Health data lives on the iPhone and does not sync to a Mac.
+
+So the Mac app imports the export Health produces: **Health → your profile picture → Export All Health Data**, then drop the zip on the app.
+
+On a phone, all of that is ceremony around data already sitting in the store. The iPhone app asks HealthKit instead. That also brings **provider lab results** within reach: HealthKit returns the same FHIR `Observation` resources that an export writes into `clinical-records/`.
+
+## Shared code
+
+Two apps that both propose `hrv_60_day_mean` must propose the same number. The code that decides what a value is lives in `shared/` and is compiled by both targets, not copied.
+
+| `shared/` | Contents |
+| --- | --- |
+| `Models/Core.swift` | `Biomarker`, `Proposal`, `Unmatched`, `ImportSummary` |
+| `Backend/Supabase.swift` | Sign-in, the biomarker catalogue, and the insert |
+| `Import/HealthKitMapping.swift` | Which HealthKit types are biomarkers, and how each one is reduced |
+| `Import/SampleReduction.swift` | The reductions, and samples → proposal |
+| `Import/BiomarkerMatcher.swift` | Name matching against the catalogue, ported from `parse.js` |
+| `Import/ClinicalRecordsReader.swift` | FHIR `Observation` → a reading |
+| `Import/ProposalAssembly.swift` | Readings → proposals, one value per biomarker |
+| `Views/Palette.swift`, `Views/Backdrop.swift` | The web app's dark colour tokens and its aurora background |
+
+Only the parts that really differ are per-platform: the Mac's zip handling and `export.xml` parser, and the iPhone's HealthKit queries.
+
+## What gets read
+
+The mapping is deliberately small. It covers HealthKit types that are biomarkers in the catalogue's sense, meaning a value with an optimal band to grade against. Step counts and workout minutes are real data, but nothing can grade them, so they are counted and dropped.
+
+Each type gets the reduction its biomarker asks for:
+
+| HealthKit type | Biomarker | Reduction |
+| --- | --- | --- |
+| `VO2Max` | `vo2_max` | Latest |
+| `RestingHeartRate` | `resting_heart_rate` | Median over 30 days |
+| `HeartRateVariabilitySDNN` | `hrv_60_day_mean` | Mean over 60 days |
+| `OxygenSaturation` | `resting_spo2` | Median over 30 days, converted from a 0–1 fraction |
+| `BloodPressureSystolic` | `bp_systolic` | Latest |
+| `BloodPressureDiastolic` | `bp_diastolic` | Latest |
+| `BloodGlucose` | `fasting_glucose` | Latest, with a caveat |
+
+<Warning>
+  Apple Health does not record whether a glucose reading was taken fasting. Proposals for `fasting_glucose` carry that caveat, so check before accepting one.
+</Warning>
+
+Five more mappings are written but inert, because their biomarkers are not in the catalogue yet: `bmi`, `respiratory_rate`, `heart_rate_recovery`, `body_fat_pct` and `waist_circumference`. They wait on [pending migrations](/aletheia/biomarkers#pending-changes). Until then, review lists them as unplaceable, so the gap is visible.
+
+The iPhone app also reads `labResultRecord` and `vitalSignRecord` from the clinical store. The Mac app reads `clinical-records/*.json` from the export. Where a lab result and a wearable both answer for one biomarker, **the lab wins**, because it measured the thing directly.
+
+### Reduction windows
+
+On both platforms, a window ends at the **newest sample**, not today. If you left your watch off for three weeks, you still get a real 30-day median. Anchoring on today would quietly shrink the window and change the number without saying so.
+
+## Mac: reading a large export
+
+`export.xml` is routinely hundreds of megabytes. Foundation's `XMLParser` can't handle that efficiently: it holds the whole input in libxml2, so memory tracks file size no matter how it is fed.
+
+The Mac app reads fixed-size chunks and matches records line by line. The format supports this: the exporter writes one element per line, and a record with `<MetadataEntry>` children still declares every attribute on its opening line.
+
+| | 32 MB export | 176 MB export |
+| --- | --- | --- |
+| `XMLParser` | 35 MB | 152 MB |
+| Aletheia's parser | **13 MB** | **13 MB** |
+
+It parses 1,000,000 records in 2.6 seconds.
+
+<Note>
+  The `autoreleasepool` inside the chunk loop is load-bearing. `FileHandle` returns an autoreleased `Data` for each chunk. Without draining the pool, every chunk stays alive until the parse ends, which rebuilds a copy of the whole file.
+</Note>
+
+### Tests
+
+`Import/` has no UI dependencies, so the pipeline runs headless. The harness builds a synthetic export full of traps:
+
+- A 60-day mean that a naive all-history average gets wrong
+- A resting heart rate with an absurd outlier
+- SpO₂ stored as a 0–1 fraction
+- A VO₂ max whose latest reading is worse than an older one
+- 200,000 step records that must never be proposed
+- A non-numeric culture result that must be surfaced, not forced onto a near match
+
+## iPhone: permissions
+
+### Declined reads look like empty data
+
+HealthKit never reports a declined **read**. `authorizationStatus` only describes sharing, and a refused read looks exactly like an empty store, so an app can't infer what it wasn't shown. The app can't honestly say "denied". Its empty state points to **Settings → Privacy & Security → Health → Aletheia** instead.
+
+### Clinical records are guarded, not caught
+
+Clinical records are requested in a separate call, and only when `supportsHealthRecords()` returns `true`. Asking for a clinical type without the Health Records entitlement throws an Objective-C exception that Swift's `catch` can't see, and the app crashes. Without the entitlement, the review screen says clinical records are unavailable.
+
+For the same reason, units are built from typed `HKUnit` constructors rather than parsed from strings. `HKUnit(from:)` also raises an uncatchable exception on input it can't read.
+
+### Purpose strings must be real sentences
+
+iOS validates `NSHealthShareUsageDescription`. A placeholder like "Probe." aborts the app on launch.
+
+### History range on iOS 26 and later
+
+The permission sheet now asks how far back to share: **Past 30 Days** or **All Recorded Data**. Choosing 30 days silently truncates every window, so a 60-day mean becomes a 30-day mean under the same name. Choose **All Recorded Data**.
+
+### No background sync
+
+`HKObserverQuery` with background delivery would let the app save new samples as they arrive, without anyone reviewing them. That is exactly what the review step exists to prevent. Reading only happens when you ask for it.
+
+## iPhone: signing
+
+HealthKit is an entitled capability, so a phone build needs a development team.
+
+- `Aletheia.entitlements` includes `com.apple.developer.healthkit`. Set `DEVELOPMENT_TEAM` in `project.yml`, or pick a team in Xcode, and automatic signing provisions it.
+- `com.apple.developer.healthkit.access` (Health Records) is **commented out**, so the default build signs with any account. It is a restricted capability that must be enabled on the App ID. Once it is, uncomment it and the clinical path starts returning documents with no code change.
+
+## iPhone: testing
+
+<Tabs>
+  <Tab title="Simulator">
+    The simulator exercises sign-in, the record, and the full read → review → save path with data you enter yourself.
+
+    ```bash
+    cd ios && xcodegen generate
+    xcodebuild -project Aletheia.xcodeproj -scheme Aletheia -configuration Debug \
+      -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath .build build
+    xcrun simctl boot "iPhone 17 Pro"; open -a Simulator
+    xcrun simctl install booted .build/Build/Products/Debug-iphonesimulator/Aletheia.app
+    xcrun simctl launch booted com.marcobuhlmann.aletheia
+    ```
+
+    <Warning>
+      Don't add `CODE_SIGNING_ALLOWED=NO`. It builds a binary without the HealthKit entitlement, and every Health read then fails for a reason that looks nothing like the cause. Ad-hoc simulator signing is the default and needs no account.
+    </Warning>
+
+    Then add data in the simulator's **Health** app: **Browse → a metric → Add Data**. Blood pressure, blood glucose, blood oxygen, resting heart rate and VO₂ max can all be entered by hand. Add several readings across different days for anything with a window. One reading makes a 30-day median that is just that reading.
+
+    The simulator can't show provider lab results, because `supportsHealthRecords()` is `false`.
+  </Tab>
+
+  <Tab title="Phone">
+    The only way to test what the app is actually for.
+
+    1. Open `Aletheia.xcodeproj`, select the target, go to **Signing & Capabilities** and pick a team. Or set `DEVELOPMENT_TEAM` in `project.yml` and regenerate.
+    2. Connect the phone, choose it as the destination, and press ⌘R.
+    3. To change what the app may read later, go to **Health → Sharing → Apps**. The first-run sheet only appears once.
+
+    If provisioning fails, fix signing first. None of the app runs without it.
+  </Tab>
+</Tabs>
+
+## Verified
+
+- Every source type-checks under Swift 6 strict concurrency. Both apps build for device and simulator SDKs (Xcode 26.4 / iOS 26.4 and Xcode 27 beta / iOS 27).
+- Sign-in reaches Supabase Auth and maps errors through the shared client.
+- All seven reductions give the right answer on the fixture in `ios/Fixture`: resting heart rate 62 from 29 in-window readings (outlier absorbed by the median, 20 older readings excluded), HRV 60.0 ms from 40 of 60 samples, blood oxygen 97 from a 0.97 fraction, VO₂ max 38.5 rather than an older, better 42, blood pressure 118/76, and glucose 92.
+
+Not yet verified anywhere: the clinical records path, which needs both the entitlement and a phone with a provider connected.
+
+## Still to do
+
+- The record tab shows `dashboard.html` in a `WKWebView` on both platforms, so there is one implementation of the figure. A native body map is not built yet.
+- Blood pressure arrives as two separate quantity types and is proposed as two values. Reading `HKCorrelationTypeIdentifierBloodPressure` would keep each systolic reading paired with its diastolic.
+- The app could warn when its oldest visible sample is suspiciously recent, which would catch the 30-day permission choice.
+- There is no Apple Watch target. A complication showing the record's worst status is the obvious next step.
+- The Mac app matches clinical records by name only. LOINC codes are more reliable, but only worth adding from a verified table.

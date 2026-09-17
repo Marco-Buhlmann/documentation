@@ -40,7 +40,8 @@
             "pages": [
               "aletheia",
               "aletheia/architecture",
-              "aletheia/access"
+              "aletheia/access",
+              "aletheia/apple-apps"
             ]
           }
         ]
