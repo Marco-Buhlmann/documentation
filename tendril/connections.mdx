@@ -1,0 +1,122 @@
+---
+title: "Connections"
+description: "Links you draw, connections Tendril infers from shared threads and meetings, and how duplicates are found."
+icon: "diagram-project"
+---
+
+Tendril has two kinds of relationship, and it keeps them separate:
+
+| | Drawn links | Inferred connections |
+| --- | --- | --- |
+| **Comes from** | You, using **Link to someone…** on a contact | Mail threads, meetings, group chats and shared work domains |
+| **Has a kind** | `knows` · `worked with` · `introduced by` · `family` · `investor` | No. It has a score, a confidence level and a channel. |
+| **Stored** | In `tendril.json` | Recomputed on every index rebuild, never saved |
+| **In the graph** | Solid lines | Dashed lines |
+
+<Note>
+  Inferred connections are never turned into links automatically. The kind of a link is your judgement, and guesses don't belong in data you curated. You make a suggestion a link yourself, and choose its kind when you do.
+</Note>
+
+## How a connection is inferred
+
+Every source produces *co-occurrences*: occasions when several people other than you showed up together. Tendril looks at each pair of contacts in a co-occurrence and adds weight to the connection between them.
+
+| Co-occurrence | One per | Convener |
+| --- | --- | --- |
+| Mail thread | Thread per month, with 2 to 12 other people including the sender | The sender, unless it was you |
+| Calendar event | Occurrence, with 2 to 12 other attendees | The organizer, unless it was you |
+| iMessage or Beeper group chat | Month the chat had messages, with 2 to 12 other members | Nobody |
+| Shared work domain | Domain, with 2 to 12 addresses on your cards | Nobody |
+
+### The weight
+
+Each pair in a co-occurrence gets:
+
+```text
+weight = 1 / (n − 1)  ×  channel weight  ×  0.5 ^ (months ago / 15)
+```
+
+<AccordionGroup>
+  <Accordion title="1 / (n − 1): group size">
+    Here `n` is the number of other people present. This is the weighting used for co-authorship networks. A three-way thread is good evidence that two people know each other, and a twelve-way thread is very weak evidence.
+
+    `n` includes people who don't have a card. A twelve-person meeting is still weak evidence even if only two of the attendees are in your address book.
+  </Accordion>
+
+  <Accordion title="Channel weight">
+    | Channel | Weight | Why |
+    | --- | --- | --- |
+    | Calendar | 1.0 | A meeting means they spoke. |
+    | Shared work domain | 0.7 | Strong at a small company. The group-size factor reduces it at larger ones. |
+    | Email | 0.6 | Being cc'd together only means they were both nearby. |
+    | Group chat | 0.5 | |
+  </Accordion>
+
+  <Accordion title="Decay">
+    Weight halves every **15 months**. Without decay, a project that ended in 2019 would outrank your current work forever. Shared work domains are dated at rebuild time and don't decay, because working somewhere is an ongoing fact, not a single event.
+  </Accordion>
+</AccordionGroup>
+
+For a sense of scale: a recent meeting with two other people scores **1.0** for that pair. A twelve-way cc thread scores about **0.05**. Both halve every 15 months.
+
+## Confidence
+
+A raw score only means something next to other scores, and showing "0.83" on a contact card would suggest more precision than the evidence has. So Tendril shows three levels instead:
+
+| Level | Score | Means |
+| --- | --- | --- |
+| **Strong** | 1.5 or more | Together repeatedly, in small groups or recently |
+| **Likely** | 0.4 or more | In the same small group more than once |
+| **Possible** | Below 0.4 | Seen together, but not much: big threads, or a long time ago |
+
+A pair seen together on **only one occasion** is hidden. Two people cc'd on one thread haven't been shown to know each other.
+
+Shared work domains are the exception, since working somewhere doesn't happen twice. A shared domain alone is enough if its score reaches **0.15**, which in practice only a small employer does. Five addresses on a domain give 0.175, which passes. Six give 0.14, which doesn't. Larger shared domains, up to 12 addresses, still add weight to pairs that have other evidence. Being cc'd once *and* working at the same company counts for more than either one alone.
+
+Personal email providers and ISPs never count as a shared domain. See [Sources](/tendril/sources#shared-work-domains).
+
+## Introduced by
+
+If two people's **earliest** shared occasion was started by a third person, Tendril shows that person as having introduced them (`via …`).
+
+- Only mail threads and meetings have someone who started them. Group chats and shared domains never produce an introduction.
+- Threads you sent and meetings you organized don't count. You connected those people, not a third party.
+- Converting a suggestion into an `introduced by` link doesn't keep who made the introduction yet. See [Limits](/tendril#limits).
+
+## Where connections appear
+
+### On a contact
+
+The **Connections** card shows counts first, so you can see how many of your contacts someone knows without opening anything: **linked**, then **strong**, **likely** and **possible**. Click a count to see the people in it. Each inferred row shows the other person, who introduced them if known, and how they are connected: `met`, `cc`, `same company` or `group`.
+
+### The Connections screen
+
+A 3D force-directed graph of everyone involved in a link or suggestion. Stronger connections pull people closer together. Selecting a contact highlights them and their neighbours and shows their faces.
+
+- The graph draws up to **160** suggestions, with stronger ones drawn more boldly. The layout supports up to 400 contacts.
+- The **Suggested** list below the graph shows the top 12 suggestions that aren't links yet, each with a menu to make it a link.
+- Uncheck **Suggested** to see only the links you drew.
+
+### Checking the weighting
+
+Your own links are the only ground truth available, so Tendril checks against them after every rebuild. The Connections screen shows a line like:
+
+```text
+14/17 manual links found, 9 in the top 10%, median rank 38 of 2,412
+```
+
+If your own links don't rank near the top, the weighting is wrong. Use this line when tuning the numbers. They're all defined together in `EdgeScore` in `Interactions.swift`.
+
+## Duplicates
+
+The **Duplicates** screen groups cards that share any of these:
+
+| Key | Normalized as |
+| --- | --- |
+| **Name** | First and last name with case and accents ignored, keeping only letters and digits |
+| **Email** | Lowercased and trimmed |
+| **Phone** | Last 10 digits. Numbers with fewer than 10 digits are ignored. |
+
+Cards are joined transitively (union-find). If A and B share an email and B and C share a name, all three are in one cluster. A cluster that shares an email or phone is **high confidence** and listed first. A shared name alone isn't. Turn on **Only high-confidence** to hide name-only clusters.
+
+Merging happens in Contacts.app. Tendril only finds the duplicates.

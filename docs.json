@@ -33,7 +33,16 @@
               "mockingbird/rules"
             ]
           },
-          "tendril",
+          {
+            "group": "Tendril",
+            "icon": "atom-simple",
+            "pages": [
+              "tendril",
+              "tendril/sources",
+              "tendril/connections",
+              "tendril/enrichment"
+            ]
+          },
           {
             "group": "Aletheia",
             "icon": "folder-medical",

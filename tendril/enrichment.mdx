@@ -1,0 +1,105 @@
+---
+title: "Enrichment"
+description: "Suggested job titles, companies, profiles and email addresses from Gravatar, signatures and your own mail, applied only when you accept them."
+icon: "wand-magic-sparkles"
+---
+
+Enrichment fills in what your contact cards are missing: job titles, companies, locations, photos, social profiles and email addresses. It never writes anything. Each source can only return *proposals*, and a proposal does nothing until you accept it.
+
+<Note>
+  Accepted values are stored in Tendril's own data. They are not written to the contact card in Contacts.
+</Note>
+
+## Sources
+
+| Source | Needs | Proposes | Cost |
+| --- | --- | --- | --- |
+| [Gravatar](#gravatar) | An email address on the card | Job title, company, location, bio, photo, verified profiles, Gravatar link | Free |
+| [Signatures](#signatures) | An email address and a connected mailbox | Job title, company, LinkedIn | Free |
+| [Name match](#name-match) | A name on the card and an indexed mailbox or calendar | Email addresses | Free, with no requests |
+
+If a card has no email address, only Name match runs, and the card explains why.
+
+### Gravatar
+
+Gravatar is the first source because its data is shared with consent. People create their own profile and choose what to publish, and verified accounts only list services they've proven they own. That makes it more accurate than scraped data, and more appropriate to use.
+
+Tendril sends a SHA-256 hash of each email address on the card to the Gravatar profile API. The first address with a profile is used. A `404` just means that address has no profile.
+
+| Field | Confidence |
+| --- | --- |
+| Verified accounts | 0.95 |
+| Job title, company, location, Gravatar link | 0.9 |
+| Photo, only if the card has none | 0.8 |
+| Bio | 0.7. It's what the person wrote about themselves, not a verified fact. |
+
+### Signatures
+
+A signature is written by the person themselves, it's current, and it's already in a mailbox Tendril is signed in to. That makes it the richest free source. It's also the least structured, so every value from it is a guess.
+
+For each connected mailbox, Tendril finds up to **3** recent messages *from* the contact in the last 24 months. It reads the first 12 KB of each one without marking it as read. It removes quoted replies, then looks for the signature: after a `-- ` line if there is one, otherwise at the end of the message.
+
+| Field | Confidence |
+| --- | --- |
+| LinkedIn URL | 0.85, or 0.9 if found in more than one message |
+| Job title, company | 0.65, or 0.75 if found in more than one message |
+
+A value that appears in more than one message counts as confirmed, so one unusual line doesn't win.
+
+### Name match
+
+Name match suggests email addresses for cards that don't have one. It compares the names on your cards with the names Tendril has already seen in your mail headers and calendar invitations for people who have no card. It makes no requests, because the index already read those headers to build the [Unsaved](/tendril/sources#the-unsaved-list) list.
+
+A match is **not offered** if:
+
+- The address is a role address like `info@`, `sales@`, `support@`, `noreply@` or `buchhaltung@`, including variants like `sales-eu`.
+- More than two different addresses are seen under the same name, so Tendril can't tell which is the person.
+- More than one card in your address book has that name.
+
+Otherwise the score starts at **0.55** and adjusts:
+
+| Evidence | Adjustment |
+| --- | --- |
+| The address contains both first and last name | +0.25 |
+| First initial plus last name, like `mbuhlmann` | +0.20 |
+| Last name only | +0.15 |
+| Both initials only, like `mb` | +0.10 |
+| First name only | +0.08 |
+| Seen 10 or more times, or 3 or more times | +0.12, or +0.08 |
+| Exactly two addresses share the name | −0.25 |
+
+The score never goes above 0.92, because names do collide. Anything below 0.5 isn't offered. Each suggestion says what it's based on, for example *Name match — “Katya Novak” seen 14 times, last Aug 3, 2026*.
+
+## Reviewing proposals
+
+The **Enrichment** card on a contact lists open proposals by field, most confident first. Each one shows its source, and if it would replace a value already on the card, it shows the change.
+
+- **Accept** saves the value in Tendril. A new value replaces the one you accepted before for that field. For profiles and links, that's one per service.
+- **Reject** hides the proposal. Rejections are tied to the value itself, so a later lookup won't suggest it again.
+- If two sources suggest the same value, it appears once, credited to both, with the higher of their two confidence scores.
+
+Results are cached for each contact. Click **Enrich** to look a contact up for the first time. After that, it's only looked up again when you click **Refresh**.
+
+## Enriching many contacts
+
+The toolbar's enrich button runs on **the contacts currently shown**, whether that's everyone, a group or a search. It always asks first, because a bulk run is the one action in Tendril that sends requests out over and over. The confirmation sheet shows:
+
+- How many contacts will be checked, and how many were already checked. Those are skipped unless you turn on **Re-check contacts already looked up**.
+- The limit of **250 contacts per run**. Run it again to do the rest.
+- The cost, which is currently always *Free*, and an estimated time.
+
+While it runs you can **Stop** it or **Run in background**. A run keeps going if you close the sheet. If you stop partway through, the contact being checked at that moment isn't saved, so it will be checked again next time instead of being marked done.
+
+## Adding a source
+
+A source implements `Enricher` in `Enrichment.swift`:
+
+```swift
+protocol Enricher: Sendable {
+    var name: String { get }
+    var centsPerLookup: Double { get }   // shown before a bulk run; 0 for free sources
+    func propose(for subject: EnrichSubject) async throws -> [Proposal]
+}
+```
+
+An enricher receives an `EnrichSubject`, a copy of the contact's relevant fields, not the contact itself. That way it can't reach the store or run on the main thread. It can only return proposals. To add it to runs, add it in `EnrichmentEngine.makeEnrichers()`. `centsPerLookup` exists so that a paid source can't be added without its cost appearing in the confirmation sheet.
