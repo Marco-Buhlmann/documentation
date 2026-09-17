@@ -12,15 +12,6 @@
     "dark": "/images/3cvc.png"
   },
   "navigation": {
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        }
-      ]
-    },
     "groups": [
       {
         "group": "Overview",
