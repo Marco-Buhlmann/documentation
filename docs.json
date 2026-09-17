@@ -15,14 +15,11 @@
     "pages": [
       {
         "group": "Overview",
-        "pages": [
-          "index"
-        ]
+        "pages": []
       },
       {
         "group": "Getting Started",
         "pages": [
-          "index",
           "jcore",
           "mockingbird",
           "tendril",
