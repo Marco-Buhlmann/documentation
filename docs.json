@@ -37,7 +37,8 @@
             "group": "Tendril",
             "icon": "atom-simple",
             "pages": [
-              "tendril"
+              "tendril",
+              "tendril/connections"
             ]
           },
           "aletheia"
