@@ -16,18 +16,17 @@
       {
         "group": "Overview",
         "pages": [
-          "index",
-          "jcore",
-          "mockingbird",
-          "tendril"
+          "index"
         ]
       },
-      "aletheia",
       {
         "group": "Getting Started",
         "pages": [
           "index",
-          "quickstart"
+          "jcore",
+          "mockingbird",
+          "tendril",
+          "aletheia"
         ]
       }
     ],
