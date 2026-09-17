@@ -1,0 +1,102 @@
+---
+title: "Enforcement"
+description: "The PreToolUse guard: installing it, what it blocks, pausing and stopping it, and how it behaves."
+icon: "shield-halved"
+---
+
+Mockingbird scores many things it doesn't control. The one thing it actually enforces is the P4 guard: a `PreToolUse` hook that checks every tool call before the call runs.
+
+Where the hook sits is the point. Permission rules live next to general-purpose interpreters. A deny rule next to a wildcard Python grant stops an honest agent, but not one that has been redirected. The guard reads the command string no matter which interpreter would run it.
+
+## Install
+
+In the app, open **Enforcement**, click **Install / update guard**, then click **Register as PreToolUse**.
+
+Or from a shell:
+
+```bash
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --emit-fixes ~/agent/work/mockingbird
+bash ~/agent/work/mockingbird/_guard-install.sh
+bash ~/agent/work/mockingbird/_guard-register.sh
+```
+
+Registering *adds* the guard to `hooks.PreToolUse`. Your existing hooks keep their place and order. Before the change, `settings.json` is copied to `settings.json.mbird-<timestamp>.bak`.
+
+## What it blocks
+
+| Category | Covers |
+|---|---|
+| T0 paths | The screenpipe capture store, the Messages and Mail stores, SSH key material, keychains, your photo library and your sealed documents directory |
+| Destructive commands | Recursive remove (`rm -rf`) · `DELETE FROM` · `DROP TABLE` · `--force` · the `tccutil` privacy reset |
+
+The guard blocks a call by exiting with code 2. Every call is added to `~/agent/audit/tools.jsonl` with the current enforcement mode, so you can see afterwards what ran while the guard was paused.
+
+## State
+
+The guard reads `~/.config/mockingbird/enforcement.json` again on **every** call. Pausing and stopping take effect right away, with no restart, re-registration or reinstall.
+
+```jsonc
+{
+  "mode": "active" | "paused" | "stopped",
+  "until": "2026-09-04T22:00:00Z",   // a timed pause resumes by itself
+  "guardT0": true,
+  "guardDestructive": true
+}
+```
+
+| Mode | Behavior |
+|---|---|
+| **Active** | Blocks matching calls and logs every call. |
+| **Paused** | For 15 minutes, 1 hour, 4 hours or until you resume. Allows calls and keeps logging. |
+| **Stopped** | The guard stays installed and keeps logging, but allows every call (exit 0). |
+
+When enforcement is paused or stopped, a banner appears on every screen and the menu bar icon becomes hollow.
+
+## What it checks
+
+The guard reads what a call *does*, not the data it carries.
+
+| What | Taken from | Checked for |
+|---|---|---|
+| Command | `command`, `cmd`, `script`, `code` in `tool_input` | T0 paths **and** destructive commands |
+| Paths | `file_path`, `path`, `notebook_path`, `pattern`, `glob`, any `*_path` or `*_file` | T0 paths |
+| Executable content | `content` or `new_string`, **only** when the target looks executable: a script extension, a path under `/bin/` or `/hooks/`, or no extension at all | T0 paths and destructive commands |
+
+Otherwise, the guard doesn't check file contents. A document that mentions a path isn't accessing it, and checking prose added nothing. Text about a destructive command deletes nothing. A script that contains one is still refused: once when it's written to an executable path, and again when it runs.
+
+### Unrecognized payloads
+
+Unrecognized payloads are handled on the safe side:
+
+- **Valid JSON, but no recognizable fields.** The guard still checks every byte for a T0 path, because a T0 path in any argument means something is pointing at an original. It only checks for destructive commands when the tool name suggests it runs things: `bash`, `shell`, `exec`, `run`, `command`, `terminal`, `script`, `osascript`, `process` or `eval`. That way a search query or message body can still mention those commands.
+- **Not JSON at all.** The guard checks the whole payload for both patterns.
+
+## How it behaves
+
+These calls were tested against a sandboxed `HOME`, and every case passed:
+
+| Call | Result |
+|---|---|
+| `Bash` running `sqlite3` against the T0 store | Blocked |
+| `Bash` with a recursive remove, or a force push | Blocked |
+| `Bash` listing `~/agent/derived` | Allowed |
+| `Read` of a T0 private key | Blocked |
+| `Grep` whose path is the capture store | Blocked |
+| `Write` of prose that mentions a T0 path and a destructive command | **Allowed** |
+| `Write` of a `.sh` file that contains a destructive command | Blocked |
+| `Write` of a file with no extension under `bin/` that reads T0 | Blocked |
+| `Edit` adding prose to a `.md` file | Allowed |
+| MCP search whose query mentions a destructive command | Allowed |
+| MCP note whose body mentions a T0 path | Blocked |
+| Unknown tool named `run_shell` with the command under an unusual key | Blocked |
+| Non-JSON payload that contains a destructive command | Blocked |
+
+Four rules re-run cases from this table on every scan: the two blocks, the prose that's allowed and the script that's refused. They set `MB_SELFTEST=1` so the guard responds as if it's active, whatever the current mode.
+
+<Tip>
+  A control you've never triggered is only an assumption. A control that blocks too much gets switched off, which leaves you in the same place. The self-tests guard against both.
+</Tip>
+
+## Remove the guard
+
+Click **Remove** in the Enforcement tab, or run `_guard-uninstall.sh`. This unregisters the hook and renames the script to `t0-guard.removed-<timestamp>` instead of deleting it. The doctrine's N6, never delegate deletion, applies to Mockingbird too.

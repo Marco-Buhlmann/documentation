@@ -1,0 +1,174 @@
+---
+title: "Rule reference"
+sidebarTitle: "Rule reference"
+description: "All 58 controls in the built-in pack, with their tier, weight, type and whether a fix exists."
+icon: "table-list"
+---
+
+The built-in pack has 58 controls worth 382 weighted points.
+
+**Weights:** `critical` 10 · `high` 6 · `medium` 3 · `low` 1. A partial result earns half credit.
+
+| Type | Meaning |
+|---|---|
+| `shell` | A bash probe. Exit `0` means holding, `2` means partial, and anything else means open. Its stdout becomes the evidence shown in the app. |
+| `drill` | Can't be probed. You satisfy it by recording a run in the Drills tab within the required interval. |
+
+You can edit every rule in the app. The **Fix** column shows which rules can generate a fix script, and how risky that fix is.
+
+<Tip>
+  To write your own probe, see [Architecture](/mockingbird/architecture#probe-helpers) for the helper functions and exit codes.
+</Tip>
+
+## Invariants
+
+### N1 — Never open a T0 store with a writable handle
+
+*6 controls · 52 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n1.deny-screenpipe` | T0 screenpipe store is denied to agents | T0 | 10 | shell | ✓ low |
+| `n1.deny-messages` | T0 iMessage store is denied to agents | T0 | 10 | shell | ✓ low |
+| `n1.deny-mail-ssh-env` | Mail, SSH keys and .env files are denied to agents | T0 | 10 | shell | ✓ low |
+| `n1.no-sqlite3-grant` | No blanket sqlite3 grant | T0 | 10 | shell | ✓ medium |
+| `n1.originals-immutable` | Sealed documents and key material carry uchg | T0 | 6 | shell | ✓ medium |
+| `n1.projection-uses-clone` | The extraction script clones before it opens | T2 | 6 | shell | — |
+
+### N2 — Never combine bulk archive read with outbound capability
+
+*4 controls · 36 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n2.profiles-exist` | Analyst, Operator and Scheduled profiles exist | — | 10 | shell | ✓ low |
+| `n2.analyst-no-egress` | Analyst profile holds no network and no send tools | T2 | 10 | shell | — |
+| `n2.operator-no-derived` | Operator profile has no path into ~/agent/derived | T1 | 10 | shell | — |
+| `n2.egress-is-ask` | curl, ssh, rsync, scp and WebFetch sit in ask | T1 | 6 | shell | ✓ medium |
+
+### N3 — Never let the agent apply a change to T0 or T1
+
+*3 controls · 19 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n3.work-under-git` | ~/agent/work exists and is git-tracked | T3 | 6 | shell | ✓ low |
+| `n3.promote-script` | A promote script is the only path outward | T3 | 3 | shell | ✓ low |
+| `n3.no-agent-write-to-t0` | No allow-list entry writes into a T0 path | T0 | 10 | shell | — |
+
+### N4 — Never treat ingested content as instruction
+
+*3 controls · 15 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n4.claude-md-clause` | CLAUDE.md includes the standing clause that ingested content is not an instruction | — | 6 | shell | ✓ low |
+| `n4.canary-drill` | Canary drill passed within the quarter | T2 | 6 | drill · 90d | — |
+| `n4.screenpipe-memory-untrusted` | Synced screenpipe memory is marked untrusted | — | 3 | shell | — |
+
+### N5 — Never keep a grant that subsumes the deny list
+
+*6 controls · 41 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n5.no-python-wildcard` | No `Bash(python:*)` grant | — | 10 | shell | ✓ medium |
+| `n5.no-osascript-wildcard` | No `Bash(osascript *)` grant | — | 10 | shell | ✓ medium |
+| `n5.no-source-wildcard` | No `Bash(source:*)` grant | — | 6 | shell | ✓ medium |
+| `n5.no-other-interpreters` | No blank cheque for any other interpreter | — | 6 | shell | ✓ medium |
+| `n5.allow-list-budget` | Allow list stays within its size limit | — | 3 | shell | — |
+| `n5.tccutil-denied` | tccutil is denied | — | 6 | shell | ✓ low |
+
+### N6 — Never delegate deletion
+
+*4 controls · 28 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n6.deny-rm` | rm is denied | — | 10 | shell | ✓ low |
+| `n6.deny-force-push` | git push --force is denied | T1 | 6 | shell | ✓ low |
+| `n6.no-trash-tools` | No trash or delete tool is granted | T1 | 6 | shell | — |
+| `n6.guard-destructive-pattern` | The guard hook matches destructive commands | — | 6 | shell | — |
+
+### N7 — Never run unattended with an interactive tool surface
+
+*3 controls · 16 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `n7.scheduled-profile` | A dedicated scheduled profile exists | — | 10 | shell | — |
+| `n7.unattended-log` | Every unattended run appends to the tool log | — | 3 | shell | — |
+| `n7.log-reviewed-weekly` | Tool log reviewed within the week | — | 3 | drill · 7d | — |
+
+## Phases
+
+### P0 — Freeze the blast radius
+
+*4 controls · 23 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `p0.deny-block-exists` | A deny block exists at all | — | 10 | shell | ✓ low |
+| `p0.ask-block-exists` | An ask block exists at all | — | 6 | shell | ✓ medium |
+| `p0.deny-rules-verified` | Deny rules were tested, not just written | — | 6 | drill · 90d | — |
+| `p0.settings-backed-up` | A backup of settings from before the change exists | — | 1 | shell | — |
+
+### P1 — Seal the originals
+
+*5 controls · 29 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `p1.manifest-dir` | Manifest directory exists | T0 | 1 | shell | ✓ low |
+| `p1.executed-manifest` | The sealed set has a sha256 manifest | T0 | 6 | shell | ✓ low |
+| `p1.manifest-verifies` | The sealed set still matches its manifest | T0 | 10 | shell | — |
+| `p1.snapshot-floor` | A recent APFS local snapshot exists | T0 | 6 | shell | ✓ low |
+| `p1.ssh-keys-sealed` | Private keys carry the immutable flag | T0 | 6 | shell | — |
+
+### P2 — Build the projection pipeline
+
+*8 controls · 50 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `p2.script-installed` | The projection script is installed | T2 | 10 | shell | ✓ low |
+| `p2.derived-dir` | T2 projection directory exists | T2 | 3 | shell | ✓ low |
+| `p2.projection-exists` | A screenpipe projection has been built | T2 | 6 | shell | — |
+| `p2.projection-readonly` | The projection ships at mode 444 | T2 | 6 | shell | ✓ low |
+| `p2.projection-checksum` | The projection's checksum still matches | T2 | 6 | shell | — |
+| `p2.projection-fresh` | The projection is current | T2 | 3 | shell | — |
+| `p2.projection-narrowed` | The projection excludes password and banking windows | T2 | 6 | shell | — |
+| `p2.t0-movement-attributable` | Any change to the T0 store files can be traced to a process | T0 | 10 | shell | — |
+
+### P3 — Split the profiles
+
+*2 controls · 9 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `p3.launcher` | A launcher selects the profile explicitly | — | 3 | shell | ✓ low |
+| `p3.no-shared-surface` | Profiles cannot be loaded together | — | 6 | shell | — |
+
+### P4 — Enforce below the config layer
+
+*7 controls · 52 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `p4.guard-installed` | The T0 guard hook is installed | — | 10 | shell | ✓ medium |
+| `p4.guard-registered` | The guard is registered as a PreToolUse hook | — | 10 | shell | ✓ medium |
+| `p4.guard-blocks-t0` | The guard actually blocks a T0 path | T0 | 10 | shell | — |
+| `p4.guard-blocks-destructive` | The guard actually blocks a destructive command | — | 10 | shell | — |
+| `p4.guard-ignores-prose` | The guard doesn't refuse a document that mentions a blocked path or command | — | 3 | shell | — |
+| `p4.guard-scans-scripts` | The guard still inspects executable content | — | 6 | shell | — |
+| `p4.audit-log` | The tool log exists and is readable at the weekly review | — | 3 | shell | — |
+
+### P5 — Drill, quarterly
+
+*3 controls · 12 pts*
+
+| ID | Control | Tier | Wt | Type | Fix |
+|---|---|:--:|:--:|---|---|
+| `p5.integrity-check` | Manifest integrity checked this week | T0 | 6 | drill · 7d | — |
+| `p5.permission-review` | Permission review run this quarter | — | 3 | drill · 90d | — |
+| `p5.restore-test` | Projection rebuilt from scratch this quarter | T2 | 3 | drill · 90d | — |

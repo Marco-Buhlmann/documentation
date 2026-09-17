@@ -4,4 +4,132 @@ icon:
   name: "bird"
   style: "regular"
   library: "fontawesome"
+description: "Checks, fixes and enforcement for one OPSEC doctrine on one Mac."
+sidebarTitle: "Overview"
 ---
+
+Mockingbird is a native macOS app. It checks your Mac against an operating doctrine, sets up the controls the doctrine calls for, and tells you when one of them stops working. You can pause or stop enforcement at any time without uninstalling it.
+
+It ships with one doctrine, **Never Touch The Original**. Every rule is a shell probe you can edit, so the score follows whatever rule pack you load.
+
+<Note>
+  Mockingbird runs locally. It makes no network calls, and everything it stores is plain JSON on your Mac.
+</Note>
+
+## What it does
+
+|  |  |
+| --- | --- |
+| **Measures** | 58 probes, one for each checkable claim in the doctrine's invariants (N1–N7) and phases (P0–P5). Each one runs live and reports the evidence it found. |
+| **Scores** | Weighted by severity: critical 10, high 6, medium 3, low 1. A partial result earns half credit. You get an overall percentage plus a score for each invariant and phase. |
+| **Implements** | If a rule has a safe fix, Mockingbird writes it out as a shell script. You read the script, then apply it or run it yourself. Settings are backed up first. |
+| **Adjusts** | You can edit every probe, weight and on/off setting in the app, and your changes are saved. You can also add your own rules. |
+| **Monitors** | Scans again on a schedule and records regressions, config changes, allow-list changes and movement in T0 stores. |
+| **Pauses and stops** | The guard reads Mockingbird's state file on every call, so pausing or stopping works right away. |
+
+## Install
+
+Requires macOS 14 or later and a Swift toolchain (Xcode 16 or later).
+
+```bash
+./scripts/build-app.sh
+open dist/Mockingbird.app
+```
+
+The build script regenerates the icon, compiles a release build and assembles `dist/Mockingbird.app`. For a debug build only, run `swift build --package-path App`.
+
+### Headless use
+
+You can run Mockingbird from a shell or a cron job:
+
+```bash
+# Run every probe and print its evidence
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --scan --verbose
+
+# Write every fix script without changing anything
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --emit-fixes DIR
+```
+
+## The five screens
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="gauge">
+    The doctrine's §0 numbers, measured live. Also shows the overall score, N1–N7 and P0–P5 at a glance, and open findings sorted by how many points they cost.
+  </Card>
+
+  <Card title="Doctrine" icon="list-check">
+    Every control, filterable. Each one shows its evidence, its editable probe, its proposed fix and its results from the last 24 scans.
+  </Card>
+
+  <Card title="Monitor" icon="chart-line">
+    Score over time, config fingerprints, and a timeline of drift, fixes, drills and enforcement changes.
+  </Card>
+
+  <Card title="Enforcement" icon="shield-halved">
+    Install and register the guard. Enforce, pause or stop it, switch individual layers, and view the end of the audit log.
+  </Card>
+
+  <Card title="Drills" icon="stopwatch">
+    The six P5 exercises and their pass conditions. Recording a run here satisfies the rules that depend on drills.
+  </Card>
+</CardGroup>
+
+## Fixes are scripts, deliberately
+
+The doctrine's N3 says an agent's output is only a proposal, and you are the one who applies it. Mockingbird follows the same rule:
+
+<Steps>
+  <Step title="Prepare script">
+    Writes the change to `~/agent/work/mockingbird/fix-<rule>-<timestamp>.sh` and shows you the whole script.
+  </Step>
+  <Step title="Apply">
+    Runs that same file after you confirm. Nothing is written until you press it.
+  </Step>
+</Steps>
+
+Fixes are only as aggressive as the doctrine. Removing grants that override the deny list gets rid of blank cheques, including prefixed forms like `sudo`, `timeout 30`, an absolute path or `-c`. It keeps the spelled-out commands that N5 tells you to keep. Moving outbound network access to `ask` leaves narrow `WebFetch(domain:…)` grants alone. No fix deletes anything: removing the guard renames it with a timestamp.
+
+## Enforcement in one paragraph
+
+Settings alone are not a real boundary on a single-user Mac. The one control Mockingbird actually holds is a `PreToolUse` hook at `~/.claude/hooks/t0-guard`. It checks each tool call for T0 paths and destructive commands like `rm -rf`, `DELETE FROM`, `DROP TABLE` and `--force`, no matter which interpreter would run them. It reads the command and the paths the call touches, not the file contents the call carries. Registering the guard adds it alongside your existing hooks. The guard reads `~/.config/mockingbird/enforcement.json` on every call, so pausing works right away and a timed pause ends by itself.
+
+<Card title="Read the enforcement guide" icon="shield-halved" horizontal href="/mockingbird/enforcement">
+</Card>
+
+## Storage
+
+Plain JSON, stored locally. Nothing leaves the machine.
+
+```text
+~/Library/Application Support/Mockingbird/   rules · scans · events · drills · prefs · T0 baseline
+~/.config/mockingbird/enforcement.json       read by the guard on every call
+~/agent/work/mockingbird/                    prepared fix scripts
+```
+
+The rule pack is written once, on first launch, and Mockingbird never reads it from the app binary again. That way your edits survive upgrades. To pick up new built-in rules after an update, use **Settings → Restore built-in pack**. Your custom rules are kept.
+
+## Limits
+
+<Warning>
+  Mockingbird does not isolate anything.
+</Warning>
+
+Mockingbird runs as your user. An agent with a general-purpose interpreter can reach anything your user can reach, including this app. What the controls buy you is that a mistake takes more separate steps, and you can see each one. That lowers the risk, but it is not a boundary. For a real boundary, use a second macOS user account that owns `~/agent/`, or a virtual machine.
+
+Mockingbird also can't stop context from leaving your Mac. Anything an agent reads is sent to a model provider. Narrowing the screenpipe projection (P2) is the only control here that affects that, so take it seriously.
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Architecture" icon="sitemap" href="/mockingbird/architecture">
+    How scans run, how scoring and drift work, and how to write a probe.
+  </Card>
+
+  <Card title="Enforcement" icon="shield-halved" href="/mockingbird/enforcement">
+    Installing the guard, what it blocks, and how pausing works.
+  </Card>
+
+  <Card title="Rule reference" icon="table-list" href="/mockingbird/rules">
+    All 58 controls with their tier, weight, type and fix.
+  </Card>
+</CardGroup>

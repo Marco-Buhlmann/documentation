@@ -23,7 +23,16 @@
         "group": "Projects",
         "pages": [
           "jcore",
-          "mockingbird",
+          {
+            "group": "Mockingbird",
+            "icon": "bird",
+            "pages": [
+              "mockingbird",
+              "mockingbird/architecture",
+              "mockingbird/enforcement",
+              "mockingbird/rules"
+            ]
+          },
           "tendril",
           "aletheia"
         ]
