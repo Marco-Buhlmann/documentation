@@ -39,7 +39,8 @@
             "pages": [
               "tendril",
               "tendril/sources",
-              "tendril/connections"
+              "tendril/connections",
+              "tendril/enrichment"
             ]
           },
           "aletheia"
