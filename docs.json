@@ -7,10 +7,7 @@
     "light": "#BEFCC2",
     "dark": "#befcc2"
   },
-  "favicon": {
-    "light": "/images/3cvc.png",
-    "dark": "/images/3cvc.png"
-  },
+  "favicon": "/favicon.svg",
   "navigation": {
     "groups": [
       {
@@ -30,29 +27,13 @@
       }
     ]
   },
-  "logo": {
-    "light": "/images/3cvc.png",
-    "dark": "/images/3cvc.png",
-    "href": "https://3cubed.vc"
-  },
+  "logo": "/logo/light.svg",
   "navbar": {
     "primary": {
       "type": "button",
       "label": "Dashboard",
       "href": "https://3cubed.vc"
     }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
   },
   "footer": {
     "socials": {
