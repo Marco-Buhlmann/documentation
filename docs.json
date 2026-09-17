@@ -33,7 +33,13 @@
               "mockingbird/rules"
             ]
           },
-          "tendril",
+          {
+            "group": "Tendril",
+            "icon": "atom-simple",
+            "pages": [
+              "tendril"
+            ]
+          },
           "aletheia"
         ]
       }

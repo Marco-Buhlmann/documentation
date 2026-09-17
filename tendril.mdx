@@ -4,4 +4,137 @@ icon:
   name: "atom-simple"
   style: "regular"
   library: "fontawesome"
+sidebarTitle: "Overview"
+description: "A personal CRM on top of your macOS address book that never writes back to it."
 ---
+
+Tendril is a native macOS personal CRM built on top of the address book you already have. It reads your contacts through Apple's Contacts framework, so it sees everything your Mac syncs, iCloud included. On top of that it adds its own layer: notes, reminders, groups, relationship links, a record of how often you talk to each person, and a guess at who knows whom.
+
+<Note>
+  **Tendril never writes to your address book.** Everything it adds is stored in one JSON file on your Mac. You merge duplicates and add new cards in Contacts.app yourself, on purpose.
+</Note>
+
+## What it does
+
+|  |  |
+| --- | --- |
+| **Contacts** | Your full address book with live search across name, company, email, phone and social handles. Each card shows emails, phones, links and social profiles. |
+| **Notes and reminders** | Timestamped conversation notes for each contact. Reminders for each contact, plus one Reminders view for all of them. |
+| **Groups** | Create groups, tag contacts in and out, and filter the list by group. Deleting a group doesn't touch the contacts in it. |
+| **Interactions** | Counts messages, emails and meetings for each person from iMessage, IMAP mail, Google Calendar and Beeper. Sort by last interaction, most interactions, or who is **falling quiet**. |
+| **Connections** | Links you draw by hand, plus connections Tendril infers from shared threads, meetings, group chats and work domains. Inferred ones are graded strong, likely or possible, and can show who introduced two people. |
+| **Unsaved** | People you correspond with who have no card, named from mail headers and calendar invitations. |
+| **Duplicates** | Cards that share a name, email or phone, sorted by how confident the match is. |
+| **Enrichment** | Suggests job titles, companies, profiles, photos and missing email addresses from Gravatar, email signatures and your own correspondence. Nothing is applied until you accept it. |
+
+## Install
+
+Requires macOS 26 or later on Apple silicon, and a Swift 6.2 toolchain.
+
+```bash
+git clone https://github.com/3cubed-Ventures/tendril.git
+cd tendril
+./build.sh          # produces build/Tendril.app
+open build/Tendril.app
+```
+
+`build.sh` compiles a release build, assembles and signs the bundle, and copies it to `/Applications` if Tendril is already installed there. Pass `INSTALL=1` to install it the first time.
+
+<Tip>
+  Sign with an Apple Development certificate if you have one, because `build.sh` picks it up automatically. Keychain access and Full Disk Access are tied to the code signature. With ad-hoc signing, macOS asks for both again after every rebuild.
+</Tip>
+
+### First launch
+
+The first launch shows the macOS Contacts permission prompt. If you dismiss it, turn access back on under **System Settings › Privacy & Security › Contacts**, then reopen Tendril.
+
+To confirm that your contacts loaded, check Tendril's log:
+
+```bash
+log show --predicate 'subsystem == "com.marcobuhlmann.tendril"' --last 5m --info --style compact
+```
+
+You should see `access granted=true status=3`, then `loaded N contacts`.
+
+<Accordion title="Two macOS problems the build already handles">
+  **Contacts access needs an entitlement, not just a usage string.** The app is signed with the hardened runtime, which only allows Contacts access with `com.apple.security.personal-information.addressbook`. Without that entitlement, `CNContactStore.requestAccess` throws `CNError 100` and the permission prompt never appears, so the app looks like it has no contacts.
+
+  **SwiftPM apps don't bring their own window to the front.** When launched with `open`, the window gets created but never shows. `AppDelegate` activates the app and orders the window front explicitly. Tendril remembers where you put the window, and only positions it itself on first run or when its saved display is no longer connected.
+</Accordion>
+
+## The screens
+
+<CardGroup cols={2}>
+  <Card title="All Contacts" icon="address-book">
+    The address book, searchable and sortable. Selecting a contact shows its interactions, details, online profiles, groups, reminders, notes, connections and enrichment suggestions.
+  </Card>
+
+  <Card title="Unsaved" icon="user-question">
+    Correspondents with no card, busiest first. You can filter by at least 1, 3, 10 or 25 interactions, and dismiss people you don't want to see.
+  </Card>
+
+  <Card title="Duplicates" icon="clone">
+    Clusters of cards that share a name, email or phone. Clusters that share an email or phone count as high confidence and are listed first.
+  </Card>
+
+  <Card title="Reminders" icon="bell">
+    Every open reminder across all contacts, soonest first.
+  </Card>
+
+  <Card title="Connections" icon="diagram-project">
+    A force-directed graph of your contacts. Links you drew are solid, and inferred ones are dashed.
+  </Card>
+
+  <Card title="Sources" icon="plug">
+    Connect mail, Google Calendar, iMessage and Beeper, check each source's status, and rebuild the interaction index.
+  </Card>
+</CardGroup>
+
+## Storage
+
+All of Tendril's own data is in one file:
+
+```text
+~/Library/Application Support/Tendril/tendril.json   notes · reminders · links · groups · dismissed · enrichment
+```
+
+Credentials are kept in the macOS keychain, never in that file. This includes IMAP app passwords, Google OAuth clients and refresh tokens, and the Beeper access token. Google access tokens are only kept in memory.
+
+<Warning>
+  When you add a field to the stored payload, make it optional. Swift's generated decoder throws on a missing key even if the property has a default. Tendril would then start with an empty store, and the next save would erase every note in an older `tendril.json`.
+</Warning>
+
+## What leaves your Mac
+
+Tendril builds its index locally and keeps the results on your Mac. It only makes network requests to services you connect, plus Gravatar when you run enrichment:
+
+| Destination | When | What is sent |
+| --- | --- | --- |
+| Your IMAP server | Index rebuilds and signature enrichment | Your login. Tendril reads headers and, during enrichment, the start of a few messages. |
+| Google Calendar API | Index rebuilds, if an account is linked | Your OAuth token |
+| Beeper Desktop (`127.0.0.1:23373`) | Index rebuilds, if connected | Nothing leaves the machine |
+| Gravatar | Enrichment only | A SHA-256 hash of each contact's email address |
+
+## Limits
+
+- **Contacts can't be merged in the app.** Merging would need `CNSaveRequest` and write access to Contacts, which Tendril doesn't request. Use Contacts.app.
+- **Accepted enrichment values stay in Tendril.** They are not written back to the contact card.
+- **"Introduced by" can't be saved on a link yet.** A link stores two contacts and a kind, so converting an inferred introduction into a link loses who made it.
+- **The store rewrites the whole file on every change.** That's fine at the current size. Once notes get long, it should move to SQLite or SwiftData.
+- **There's no DMG build yet.** For now you build from source.
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Sources" icon="plug" href="/tendril/sources">
+    Connecting mail, calendar, iMessage and Beeper, and how each one is counted.
+  </Card>
+
+  <Card title="Connections" icon="diagram-project" href="/tendril/connections">
+    How Tendril infers who knows whom, and what the confidence levels mean.
+  </Card>
+
+  <Card title="Enrichment" icon="wand-magic-sparkles" href="/tendril/enrichment">
+    Where suggestions come from, and how accepting and rejecting them works.
+  </Card>
+</CardGroup>
