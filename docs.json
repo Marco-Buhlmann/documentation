@@ -15,7 +15,9 @@
     "pages": [
       {
         "group": "Overview",
-        "pages": []
+        "pages": [
+          "index"
+        ]
       },
       {
         "group": "Getting Started",
@@ -25,7 +27,8 @@
           "tendril",
           "aletheia"
         ]
-      }
+      },
+      "index"
     ],
     "global": {
       "anchors": [
