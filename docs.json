@@ -67,5 +67,8 @@
       "vscode"
     ],
     "display": "toc"
+  },
+  "background": {
+    "decoration": "gradient"
   }
 }
