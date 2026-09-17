@@ -12,24 +12,6 @@
     "dark": "/images/3cvc.png"
   },
   "navigation": {
-    "pages": [
-      {
-        "group": "Overview",
-        "pages": [
-          "index"
-        ]
-      },
-      {
-        "group": "Getting Started",
-        "pages": [
-          "jcore",
-          "mockingbird",
-          "tendril",
-          "aletheia"
-        ]
-      },
-      "index"
-    ],
     "global": {
       "anchors": [
         {
@@ -38,7 +20,24 @@
           "icon": "book-open-cover"
         }
       ]
-    }
+    },
+    "groups": [
+      {
+        "group": "Overview",
+        "pages": [
+          "index"
+        ]
+      },
+      {
+        "group": "Projects",
+        "pages": [
+          "jcore",
+          "mockingbird",
+          "tendril",
+          "aletheia"
+        ]
+      }
+    ]
   },
   "logo": {
     "light": "/images/3cvc.png",
