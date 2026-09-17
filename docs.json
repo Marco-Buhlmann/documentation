@@ -72,6 +72,6 @@
     "display": "toc"
   },
   "background": {
-    "decoration": "gradient"
+    "decoration": "grid"
   }
 }
