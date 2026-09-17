@@ -4,4 +4,68 @@ icon:
   name: "globe"
   style: "regular"
   library: "fontawesome"
+sidebarTitle: "Overview"
+description: "A memory-enabled voice assistant with contextual understanding and persistent recall."
 ---
+
+JCore is a voice assistant that remembers. Its call-name is **JIA**. You talk to it through a microphone in the room, and it answers through a speaker. Unlike a stateless assistant, it keeps what it learns in a memory store, a vector database and a knowledge graph, so later requests can draw on earlier ones.
+
+The whole pipeline is designed to run on hardware you own: wake word, speech recognition, language model and speech synthesis all run locally.
+
+<Note>
+  **JCore is in development.** The components below are the prototyping stack. Source code, setup instructions and the hardware build report aren't published yet, so this guide describes the design rather than how to install it.
+</Note>
+
+## What it does
+
+|  |  |
+| --- | --- |
+| **Listens** | Waits for a wake word, then transcribes what you say. |
+| **Remembers** | Keeps memory, embeddings and a knowledge graph of what it has learned, so it can recall context from earlier conversations. |
+| **Reasons** | Parses the intent of a request and answers it with a local LLM, using agents and pipelines for multi-step work. |
+| **Acts** | Speaks its reply, controls devices through Home Assistant, and calls external APIs as LangChain tools. |
+
+## The layers
+
+JCore is organized into four layers, from hearing a request to acting on it, on top of a shared infrastructure layer.
+
+<CardGroup cols={2}>
+  <Card title="Perception" icon="microphone">
+    Microphone, wake-word detection, speech-to-text and text-to-speech.
+  </Card>
+
+  <Card title="Context & understanding" icon="brain">
+    Memory, a vector database, a graph database and a knowledge graph.
+  </Card>
+
+  <Card title="Reasoning" icon="lightbulb">
+    Intent parsing, the language model, and agents and pipelines.
+  </Card>
+
+  <Card title="Execution & control" icon="sliders">
+    Speaker output, Home Assistant as the IoT hub, and APIs.
+  </Card>
+</CardGroup>
+
+A local network, a storage module and a dialog management module connect the layers. See [Architecture](/jcore/architecture) for the component in each slot.
+
+## Hardware
+
+These are the boards and devices used for development and prototyping:
+
+| Role | Hardware |
+| --- | --- |
+| Local AI inference | [NVIDIA Jetson Orin Nano Developer Kit](https://nvdam.widen.net/s/zkfqjmtds2/jetson-orin-datasheet-nano-developer-kit-3575392-r2) |
+| Speech recognition development | [MATRIX Voice](https://matrix-io.github.io/matrix-documentation/matrix-voice/overview/) |
+| Microphone array | [ReSpeaker Mic Array v2.0](https://wiki.seeedstudio.com/ReSpeaker_Mic_Array_v2.0/) |
+| Audio processing | [HiFiBerry DAC](https://www.hifiberry.com/) |
+| Voice assistant for Home Assistant | [Home Assistant Voice Preview Edition](https://www.home-assistant.io/voice-pe/) |
+| VPN server | [Raspberry Pi 4 Model B](https://www.raspberrypi.com/products/raspberry-pi-4-model-b/) |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/jcore/architecture">
+    Every component in the stack, layer by layer, and the infrastructure it runs on.
+  </Card>
+</CardGroup>
