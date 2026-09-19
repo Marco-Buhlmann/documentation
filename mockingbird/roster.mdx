@@ -1,0 +1,112 @@
+---
+title: "Agent Roster"
+description: "Every agent on this Mac, what it can reach, and where that evidence comes from."
+icon: "diagram-project"
+---
+
+The roster answers one question: who can reach what.
+
+Rows are the things that can act — the agents themselves, the profiles and subagent definitions they run under, scheduled jobs, and connectors. Columns are the capabilities the doctrine cares about: files, shell, code runners, network, delete, secrets, originals and connectors.
+
+<Note>
+  The roster reads what is already on your Mac. It makes no network calls, and it changes nothing it reads.
+</Note>
+
+Rows are named for the tool, not the activity, because the first thing you want to know is what a row *is*. Each row carries its model where one is declared, plus a one-line summary — a subagent's comes from its frontmatter, a connector's from what it reaches.
+
+## Map and matrix
+
+The matrix answers "who can do X" by scanning a column. It does not answer "what is this agent", which is the question you ask first. So the default view is a map.
+
+<CardGroup cols={2}>
+  <Card title="Map" icon="diagram-project">
+    A card per agent around a hub. Each names its kind, its model, what it is for, and every capability it holds — in order of consequence, with originals and secrets first.
+  </Card>
+
+  <Card title="Matrix" icon="table-cells">
+    The full grid. Use it to scan one capability down a column across every agent at once.
+  </Card>
+</CardGroup>
+
+Nerd Mode toggles between the two. Intuitive mode shows the map and keeps cards only for agents that carry a finding. Both read the same rows, and clicking any card opens the evidence behind each cell.
+
+Dashes travel from the hub outwards along each wire, in the direction the data goes. The motion carries a fact rather than decorating: a wire to an agent that can send data off your Mac is drawn brighter and thicker than one that only reads. If you have Reduce Motion turned on, the wires are drawn static.
+
+Past four agents, cards shrink to three capability lines and a "+n more". Ten are wired to the hub and the rest sit below — a smaller card still on the diagram beats a full-size one that fell off it.
+
+## Where each cell comes from
+
+A tool's own config is what that tool chose to write about itself. The roster reads past it three ways.
+
+<Steps>
+  <Step title="Connectors">
+    MCP is the common denominator across tools, and each one keeps its list somewhere else. A single scan covers Claude desktop, Claude Code (including the per-project lists in `~/.claude.json`), Cursor, Windsurf, Continue, Zed, VS Code and Codex. A server declared in two tools becomes one row that says so.
+  </Step>
+
+  <Step title="Entitlements">
+    An app's code signature is readable with no permission at all, and it is vendor-independent. It tells you what the app may *ask* macOS for.
+  </Step>
+
+  <Step title="TCC">
+    What macOS actually allowed. Mockingbird opens the TCC databases read-only and immutable, so no journal is written beside a system database.
+  </Step>
+</Steps>
+
+Entitlements and TCC disagree in both directions, which is exactly why both are worth reading. An app can declare an entitlement macOS never granted, and hold a grant its entitlements do not suggest.
+
+That is also why entitlements get their own state, **declared, not confirmed**, rather than counting as granted. An entitlement is a request, not a grant. Calling it granted would be a lie with a colour attached.
+
+### Reading TCC needs Full Disk Access
+
+<Warning>
+  To report who else holds a broad read on your Mac, Mockingbird has to hold one itself.
+</Warning>
+
+This is a genuine trade, and the app states it in the interface rather than burying it. Mockingbird asks for nothing on its own. Without the grant it says so plainly, keeps every row at "declared, not confirmed", and offers a button that opens the right settings pane.
+
+Granting it stays your act, because macOS does not let an app grant itself this. That is the point, not a limitation.
+
+## Declared versus running
+
+The roster also looks at what is *loaded*, not only what is declared, because the gap between those two is where the interesting things live. A connector running with no local declaration at all — started by an app whose connector list lives elsewhere — is listed, flagged and marked **RUNNING**.
+
+Candidates have to look like a package name or they are discarded, since a command line carries tokens, paths and JSON that you would not want collected. The several spellings one server appears under (a launcher, a Python module path, a bare binary) collapse into one row.
+
+## Rules that keep the cells honest
+
+<AccordionGroup>
+  <Accordion title="A deny narrows a capability; it does not remove one that is also granted">
+    Reporting "shell: denied" because a single narrow deny entry exists would read as though the agent cannot run commands, when it plainly can. A deny list shapes a capability. It rarely removes one.
+  </Accordion>
+
+  <Accordion title="An entry naming a T0 path is about originals, however it is spelled">
+    A read of the screen-history store is not a file permission. It is access to an original, and the roster files it that way regardless of which permission syntax expressed it.
+  </Accordion>
+
+  <Accordion title="A row nothing local can see reads 'not visible here', not blank">
+    Some apps configure their tools inside the app and on their maker's servers, where no local check can see them. An empty row would say "reaches nothing". The truth is the opposite, so those cells read as unknown and the notes explain what a row of question marks means.
+  </Accordion>
+</AccordionGroup>
+
+## Why a matrix at all
+
+The grid exists to make combinations visible. Reading widely *and* being able to send is the doctrine's N2 in a single row. An interpreter grant is N5. A scheduled job on a shared surface is N7.
+
+It also catches what a file deny list cannot. A connector that reaches a T0 store goes around `permissions.deny` entirely, because it never touches the path.
+
+## Checking it
+
+`scripts/check-roster.py` builds a home directory to order and asserts each cell and each finding — 35 checks.
+
+```bash
+python3 scripts/check-roster.py
+```
+
+Headless, the roster prints to a shell:
+
+```bash
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --roster
+```
+
+<Card title="Back to architecture" icon="sitemap" horizontal href="/mockingbird/architecture">
+</Card>

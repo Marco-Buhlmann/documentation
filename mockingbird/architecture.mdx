@@ -7,7 +7,9 @@ icon: "sitemap"
 Mockingbird is a single SwiftPM executable target, packaged into an `.app` bundle by `scripts/build-app.sh`. It has no dependencies, no `.xcodeproj` and makes no network calls.
 
 ```
-Entry.swift            argv switch — --scan / --emit-fixes / --help, else MockingbirdApp.main()
+Entry.swift            argv switch — --scan / --context / --emit-fixes / --projection-script /
+                       --ledger / --roster / --price-routine / --explain-blocks /
+                       --restore-pack / --help, else MockingbirdApp.main()
   │
   ├── Model/           what a control is
   │     Rule.swift             Rule, Section, Tier, Severity, CheckResult, Scan, Posture,
@@ -16,15 +18,29 @@ Entry.swift            argv switch — --scan / --emit-fixes / --help, else Mock
   │     +Invariants.swift      N1–N7
   │     +Phases.swift          P0–P5
   │     +Fixes.swift           remediation script generators + the guard source
+  │     Projection.swift       the P2 narrowing script generator
+  │     TokenLedger.swift      model use and API-equivalent spend
+  │     Roster.swift           every agent on this Mac and what it reaches
+  │     Explain.swift          what the guard has blocked, and what each thing does
+  │     Plain.swift            the plain-language strings Intuitive mode reads from
   │
   ├── Engine/          what it does
   │     Shell.swift            bash runner with timeout, plus Paths and Store
   │     RuleEngine.swift       evaluate → CheckResult; score → ScoreBucket
   │     PostureProbe.swift     the §0 numbers and the fingerprints drift is measured against
   │     Enforcement.swift      guard install/register/remove; FixRunner
+  │     Approval.swift         the confirmation gate in front of anything that writes
+  │     Context.swift          the allow-listed projection a copilot may see
+  │
+  ├── Design/          Theme.swift — every hex in the app, one token each
+  │                    Components.swift — the shared primitives
   │
   ├── State/AppModel   scans, events, drills, prefs, timer, drift detection
-  └── Views/           Overview · Doctrine · Monitor · Enforcement · Drills · Settings
+  └── Views/           Overview · Doctrine · Monitor · Enforcement · Drills ·
+                       Token Ledger · Agent Roster · Settings
+        RosterMapView.swift    the map: agents around a hub, wires to what they reach
+        WeeklyChart.swift      the ledger's cost and token series, drawn in one Canvas
+        Intuitive/             the second mode — same data, plain language
 ```
 
 ## How a scan works
@@ -108,6 +124,83 @@ Enforcement state is stored separately at `~/.config/mockingbird/enforcement.jso
 <Warning>
   The rule pack is written only once. Defaults go to `rules.json` on first launch, and Mockingbird never reads them from the app binary again. If you change a rule in Swift, existing installs won't see the change until you use **Settings → Restore built-in pack**.
 </Warning>
+
+## The projection scope
+
+The P2 projection is the read-only copy of screen-capture data an Analyst session may open. It is the only control in the doctrine that reduces what actually leaves your Mac, which is the reason to take it seriously.
+
+What it carries is a setting, not a default, because the right answer depends on what you want to ask it.
+
+| Scope | Ships | Answers |
+| --- | --- | --- |
+| `activityOnly` | Frames only — app, window title, timestamp | What you worked on, and when |
+| `namedApps` | Text from an allow-list of apps, within a rolling window | What was in a document you name |
+| `everythingBut` | Text from every app except an exclusion list | Anything, at the widest exposure |
+
+`Projection.script(_:)` generates `~/agent/bin/projection-narrow.py` from your choice, with a `# mockingbird-scope:` marker and one policy line per table. The `p2.projection-narrowed` rule compares that marker against your setting and checks the script still drops audio and secrets and still refuses unknown tables.
+
+### Why a script rather than a list of SQL statements
+
+The capture schema moves. The doctrine was written against tables that a current screenpipe no longer has, and a fixed list aimed at tables that are gone either fails outright or narrows nothing.
+
+The generated script reads the schema in front of it and:
+
+<Steps>
+  <Step title="Drops every full-text index first">
+    An fts5 index keeps its own copy of what it indexes. Narrowing the base tables and leaving the indexes behind would ship the text twice.
+  </Step>
+  <Step title="Applies one policy per table">
+    `keep`, `frame-text` (keep the row, blank the text columns), `by-app`, `by-frame-app`, `unattributed` (text with no app behind it, so it cannot satisfy an allow-list), or `drop`.
+  </Step>
+  <Step title="Clears browser_url everywhere, in every scope">
+    A URL carries paths, query strings and tokens.
+  </Step>
+  <Step title="Refuses to build when it meets a table it has no rule for">
+    Exit 3, naming the table. A screenpipe upgrade cannot widen your projection silently.
+  </Step>
+</Steps>
+
+<Note>
+  Audio is always dropped. Transcriptions, meetings, speakers and diarization never reach a projection in any scope, because what was said near your Mac includes people who never agreed to be recorded. Secrets, feedback and pipe output are dropped for the same reason.
+</Note>
+
+An allow-list matters more than it looks. A deny-list only covers the apps you thought of, and browser-based banking and password pages are captured under the browser's own name — so an app-name deny-list never sees them.
+
+`scripts/check-projection.sh` runs all three scopes against a fixture on the current schema and asserts what survives: 43 checks, taking the narrowing from `--projection-script`, so the file the app installs and the file under test are the same file. `scripts/projection-narrow.example.py` is that output for the widest scope, kept in the repo so you can read the policy without running anything.
+
+## The two dashboards
+
+Both read what is already on disk, and neither makes a network request.
+
+<CardGroup cols={2}>
+  <Card title="Agent Roster" icon="diagram-project" href="/mockingbird/roster">
+    Who can reach what. Rows come from config, entitlements, TCC and what is actually running.
+  </Card>
+
+  <Card title="Token Ledger" icon="coins" href="/mockingbird/ledger">
+    Token use and API-equivalent spend, by model, project and week.
+  </Card>
+</CardGroup>
+
+## Colour
+
+Every hex in the app lives in `Design/Theme.swift` and carries the token it implements. The rest of the app asks for a name, never a value. Three rules from the colour guide are structural rather than cosmetic:
+
+- **Warm neutrals, never cool.** The system has no blue, so there is no `info` colour. "Declared, not confirmed" in the roster reads as drift, which is what it is.
+- **Status colours encode state only.** Holding green, partial amber and open coral are never borrowed for decoration. The charts, the token mix and the tier diagram run on a separate warm series ramp added for exactly that purpose.
+- **Depth comes from value and a hairline**, not shadow. Semantic surfaces follow a 12% fill, 45% border, solid text recipe.
+
+### One deliberate deviation
+
+The guide's `--text-muted` is 3.68:1 on canvas — AA for large text only — and the app spends that token entirely on 8–12pt meta text across roughly 99 sites.
+
+Raising all of them to `--text-secondary` would have deleted the third type level, so the token moved instead. The new value keeps a visible step under secondary and clears 4.5:1 on canvas, surface, raised and hover. The guide's literal value survives as `inkMutedLarge`, for text at 18pt and above and for marks, which need 3:1 rather than 4.5:1.
+
+<Note>
+  The lowest text pair in the app is 4.67:1. Every word clears AA.
+</Note>
+
+Intuitive mode is the one place decoration spends a status colour: navigation tiles take their tint from where they sit rather than from any state. A navigation surface has no status of its own, so it can carry it.
 
 ## Build
 

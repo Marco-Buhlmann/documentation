@@ -37,6 +37,8 @@
               "mockingbird",
               "mockingbird/architecture",
               "mockingbird/enforcement",
+              "mockingbird/roster",
+              "mockingbird/ledger",
               "mockingbird/rules"
             ]
           },
