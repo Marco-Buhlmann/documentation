@@ -1,0 +1,87 @@
+---
+title: "Token Ledger"
+description: "What the agents on this Mac would have cost at API rates, by model, project and week."
+icon: "coins"
+---
+
+The ledger rebuilds token use and API-equivalent spend from session files that are already on your Mac.
+
+<Warning>
+  This is not a bill. It is what the same work would have cost at published API rates. If you are on a subscription, you were not charged these amounts.
+</Warning>
+
+## What it reads
+
+| Source | What it records |
+| --- | --- |
+| `~/.claude/projects` | Claude Code writes usage per assistant turn |
+| `~/.codex/sessions` | Codex writes `token_count` events per turn |
+
+Codex records two figures per event. `last_token_usage` is that turn; `total_token_usage` is cumulative, so only one of them can be summed. `cached_input_tokens` is a subset of `input_tokens`, not an addition to it — counting both would inflate every total.
+
+Nothing is written back to either directory, and nothing is sent anywhere.
+
+## Prices
+
+Cost comes from a built-in table of Anthropic rates, plus anything you add yourself in `prices.json`.
+
+<Note>
+  A model with no rate reports its tokens and a dash. It never reports a guessed figure.
+</Note>
+
+The per-file cache holds token counts only. Prices are applied when the cache is read, so editing `prices.json` re-prices your whole history immediately — there is no cache to clear.
+
+### Keeping rates current
+
+Published prices move, and a stale rate is worse than a missing one because it looks right. `--price-routine` writes a script that checks the public price lists and proposes an update:
+
+```bash
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --price-routine
+```
+
+The fetch lives in that routine, never in the app — which is what keeps the app's "no network calls" claim true. The routine proposes; you apply. It records when it last ran, and the app shows you the age of your rates so you can tell fresh numbers from old ones.
+
+## The charts
+
+Cost and tokens by week sit between the totals and the tables, drawn in a single `Canvas` rather than through a charting library. That keeps the app dependency-free and gives full control over how a line reads on a dark background.
+
+The tiles answer "the last 30 days" and the charts want your whole history, so the view builds the ledger twice. The second build is nearly free, because the per-file cache already holds it. Both modes draw the same chart.
+
+## Headless
+
+```bash
+# Token use and API-equivalent spend, 90 days by default
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --ledger
+
+# A different window
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --ledger --days 30
+```
+
+## Checking it
+
+`scripts/check-ledger.py` checks the arithmetic against hand-computed costs — 22 checks, covering cache invalidation, re-pricing from `prices.json`, and the cache-write premium.
+
+```bash
+python3 scripts/check-ledger.py
+```
+
+## The three caveats
+
+Intuitive mode states these on the card itself, because a number this easy to misread should carry them:
+
+<CardGroup cols={3}>
+  <Card title="Not a bill" icon="receipt">
+    API-equivalent cost, not what you were charged.
+  </Card>
+
+  <Card title="Prices have an age" icon="clock">
+    Rates are only as current as the last time the routine ran.
+  </Card>
+
+  <Card title="Nothing was sent" icon="lock">
+    Every figure is rebuilt from files already on your Mac.
+  </Card>
+</CardGroup>
+
+<Card title="Back to architecture" icon="sitemap" horizontal href="/mockingbird/architecture">
+</Card>

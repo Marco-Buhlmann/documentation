@@ -25,6 +25,8 @@ It ships with one doctrine, **Never Touch The Original**. Every rule is a shell 
 | **Implements** | If a rule has a safe fix, Mockingbird writes it out as a shell script. You read the script, then apply it or run it yourself. Settings are backed up first. |
 | **Adjusts** | You can edit every probe, weight and on/off setting in the app, and your changes are saved. You can also add your own rules. |
 | **Monitors** | Scans again on a schedule and records regressions, config changes, allow-list changes and movement in T0 stores. |
+| **Inventories** | Reads every agent on your Mac — its config, its entitlements, what macOS actually granted it, and what is running right now — and draws what each one can reach. |
+| **Accounts** | Rebuilds token use and API-equivalent spend per model, project and week from session files already on your Mac. |
 | **Pauses and stops** | The guard reads Mockingbird's state file on every call, so pausing or stopping works right away. |
 
 ## Install
@@ -48,9 +50,22 @@ dist/Mockingbird.app/Contents/MacOS/Mockingbird --scan --verbose
 
 # Write every fix script without changing anything
 dist/Mockingbird.app/Contents/MacOS/Mockingbird --emit-fixes DIR
+
+# Token use and API-equivalent spend
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --ledger --days 90
+
+# Every agent on this Mac, and what it reaches
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --roster
+
+# What the guard has blocked, and what each thing does
+dist/Mockingbird.app/Contents/MacOS/Mockingbird --explain-blocks
 ```
 
-## The five screens
+`--context` prints the allow-listed JSON a copilot may see, `--projection-script` prints the P2 narrowing without installing it, `--price-routine` writes the script that checks public price lists, and `--restore-pack` resets built-in rules while keeping your custom ones. Run `--help` for the full list.
+
+## The seven screens
+
+Grouped in the sidebar as **Posture**, **Control** and **Spend**.
 
 <CardGroup cols={2}>
   <Card title="Overview" icon="gauge">
@@ -72,7 +87,31 @@ dist/Mockingbird.app/Contents/MacOS/Mockingbird --emit-fixes DIR
   <Card title="Drills" icon="stopwatch">
     The six P5 exercises and their pass conditions. Recording a run here satisfies the rules that depend on drills.
   </Card>
+
+  <Card title="Token Ledger" icon="coins" href="/mockingbird/ledger">
+    What your agents would have cost at API rates, by model, project and week. Rebuilt from session files already on your Mac.
+  </Card>
+
+  <Card title="Agent Roster" icon="diagram-project" href="/mockingbird/roster">
+    Who can reach what. A map of every agent around a hub, wired to the capabilities it actually holds, with a matrix behind it.
+  </Card>
 </CardGroup>
+
+## Two modes
+
+The same data, twice.
+
+<CardGroup cols={2}>
+  <Card title="Nerd Mode" icon="terminal">
+    The screens above — probes, evidence, weights, and the full roster matrix.
+  </Card>
+
+  <Card title="Intuitive" icon="wand-magic-sparkles">
+    Plain language over identical numbers: areas instead of invariants, a card per finding, and the roster map without the matrix.
+  </Card>
+</CardGroup>
+
+Neither mode is a subset that hides a problem. The mode changes the vocabulary, not the score.
 
 ## Fixes are scripts, deliberately
 
@@ -102,9 +141,12 @@ Plain JSON, stored locally. Nothing leaves the machine.
 
 ```text
 ~/Library/Application Support/Mockingbird/   rules · scans · events · drills · prefs · T0 baseline
+                                             prices.json · ledger cache
 ~/.config/mockingbird/enforcement.json       read by the guard on every call
 ~/agent/work/mockingbird/                    prepared fix scripts
 ```
+
+The ledger reads `~/.claude/projects` and `~/.codex/sessions` and writes nothing back to either. Its cache holds token counts only, keyed by file size and modification time — prices are applied on read, so editing `prices.json` re-prices your history immediately.
 
 The rule pack is written once, on first launch, and Mockingbird never reads it from the app binary again. That way your edits survive upgrades. To pick up new built-in rules after an update, use **Settings → Restore built-in pack**. Your custom rules are kept.
 
@@ -122,7 +164,7 @@ Mockingbird also can't stop context from leaving your Mac. Anything an agent rea
 
 <CardGroup cols={3}>
   <Card title="Architecture" icon="sitemap" href="/mockingbird/architecture">
-    How scans run, how scoring and drift work, and how to write a probe.
+    How scans run, how scoring and drift work, the projection scope, and how to write a probe.
   </Card>
 
   <Card title="Enforcement" icon="shield-halved" href="/mockingbird/enforcement">
@@ -131,5 +173,13 @@ Mockingbird also can't stop context from leaving your Mac. Anything an agent rea
 
   <Card title="Rule reference" icon="table-list" href="/mockingbird/rules">
     All 58 controls with their tier, weight, type and fix.
+  </Card>
+
+  <Card title="Agent Roster" icon="diagram-project" href="/mockingbird/roster">
+    Who can reach what, and where each cell's evidence comes from.
+  </Card>
+
+  <Card title="Token Ledger" icon="coins" href="/mockingbird/ledger">
+    Token use and API-equivalent spend, and how prices stay current.
   </Card>
 </CardGroup>
